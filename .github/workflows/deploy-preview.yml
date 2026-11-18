@@ -1,0 +1,55 @@
+name: Deploy ATTEND AI preview
+
+on:
+  push:
+    branches:
+      - main
+      - feature/supabase-auth
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main site
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-site
+
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/supabase-auth
+          path: preview-source
+
+      - name: Prepare Pages files
+        run: |
+          mkdir -p public/preview
+          cp main-site/index.html public/index.html
+          cp preview-source/index.html public/preview/index.html
+          touch public/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
