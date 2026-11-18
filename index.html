@@ -163,7 +163,7 @@ async function renderTeacherDashboard(panel){
   body.append(filters,stats,wrap,message);
   const {data:records,error}=await authClient.from("attendance_records").select("attendance_date,status,checked_in_at,student_id,class_id").order("attendance_date",{ascending:false}).limit(500);
   if(error){message.textContent="출결 데이터를 불러오지 못했습니다. 담당 학급 등록과 출결 조회 권한을 확인해 주세요.";wrap.style.display="none";return;}
-  if(!records?.length){message.textContent="아직 조회 가능한 출결 기록이 없습니다. 학생과 학급을 연결하고 출석 기록이 생성되면 표시됩니다.";wrap.style.display="none";return;}
+  if(!records?.length){filters.style.display="none";stats.style.display="none";wrap.style.display="none";message.style.cssText="margin-top:14px;padding:22px;border:1px dashed #cfd7e6;border-radius:12px;background:#fafbfe;color:#667085;font-size:13px;line-height:1.8";message.textContent="아직 출결 기록이 없습니다. 현재 화면의 날짜·학생 검색은 기존 기록을 찾는 필터이며, 출결을 새로 입력하는 기능은 아닙니다. 학생 등록과 학급 배정, 출결 생성 기능은 아직 연결되지 않았습니다.";return;}
   const ids=[...new Set(records.map(x=>x.student_id))];
   const {data:people,error:peopleError}=await authClient.from("profiles").select("id,display_name,student_number").in("id",ids);
   if(peopleError){message.textContent="출결 기록은 있지만 학생 정보를 읽지 못했습니다. profiles 조회 권한을 확인해 주세요.";wrap.style.display="none";return;}
@@ -186,7 +186,7 @@ async function renderTeacherDashboard(panel){
   const trh=document.createElement("tr");["학생 이름","학번","계정 상태"].forEach(t=>{const th=document.createElement("th");th.textContent=t;th.style.cssText="padding:12px;text-align:left;background:#f7f8fc;color:#667085;border-bottom:1px solid #e6eaf1";trh.append(th)});const thead=document.createElement("thead");thead.append(trh);const tbody=document.createElement("tbody");table.append(thead,tbody);wrap.append(table);
   const msg=document.createElement("p");msg.style.cssText="padding:12px 2px;color:#718096;font-size:13px;line-height:1.6";
   body.append(intro,search,count,wrap,msg);
-  if(studentError){wrap.style.display="none";msg.textContent="학생 명단을 불러오지 못했습니다. profiles 조회 정책과 school_id 연결을 확인해 주세요.";return;}
+  if(studentError){search.style.display="none";count.style.display="none";wrap.style.display="none";msg.style.cssText="margin-top:14px;padding:22px;border:1px dashed #cfd7e6;border-radius:12px;background:#fafbfe;color:#667085;font-size:13px;line-height:1.8";msg.textContent="학생 명단을 불러오지 못했습니다. 현재 교사 계정에 담당 학급이 배정되어 있는지와 profiles 조회 권한을 확인해야 합니다. 학생을 등록하거나 학급을 배정하는 기능은 아직 연결되지 않았습니다.";return;}
   const list=students||[];
   const render=()=>{tbody.replaceChildren();const q=search.value.trim().toLowerCase();const rows=list.filter(p=>(p.display_name||"").toLowerCase().includes(q)||(p.student_number||"").toLowerCase().includes(q));count.textContent=rows.length+"명 표시 · 전체 학교 학생 "+list.length+"명 중 교사에게 허용된 계정";rows.forEach(p=>{const tr=document.createElement("tr");[p.display_name||"이름 없음",p.student_number||"학번 미등록",p.is_active?"활성":"비활성"].forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;td.style.cssText="padding:13px;border-bottom:1px solid #eef1f5";if(i===2){td.style.color=p.is_active?"#16866a":"#c94f5d";td.style.fontWeight="700"}tr.append(td)});tbody.append(tr)});if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=3;td.textContent=list.length?"검색 결과가 없습니다.":"아직 조회할 수 있는 학생이 없습니다. 학생 계정이 생성되고 교사 담당 학급에 배정되면 여기에 표시됩니다.";td.style.cssText="padding:22px;text-align:center;color:#718096;white-space:normal";tr.append(td);tbody.append(tr)}};
   search.addEventListener("input",render);render();
