@@ -142,8 +142,46 @@ async function showAuthenticatedUser(user){
  document.getElementById("authWelcome").textContent="로그인되었습니다.";
  document.getElementById("authProfileInfo").textContent=(profile.display_name||"사용자")+" · "+({student:"학생",teacher:"교사",admin:"관리자"}[profile.role]);
  const panel=document.getElementById("studentAttendance");
- if(profile.role!=="student"){
-  panel.textContent=profile.role==="teacher"?"교사 계정이 확인되었습니다. 담당 학급 연결을 확인한 뒤 교사용 출결 화면을 활성화할 예정입니다.":"관리자 계정이 확인되었습니다. 관리자 권한과 학교 설정을 검증한 뒤 관리 화면을 연결할 예정입니다.";
+ const labels={present:"출석",late:"지각",absent:"결석",needs_review:"확인 필요"};
+ if(profile.role==="admin"){
+  panel.textContent="관리자 계정이 확인되었습니다. 관리자 전용 학교 설정과 계정 관리 기능은 권한 검증 후 연결할 예정입니다.";
+  return;
+ }
+ if(profile.role==="teacher"){
+  panel.innerHTML='<h3 style="font-size:16px;margin:0 0 12px">담당 학급 출결 기록</h3><p style="color:#718096;font-size:13px">담당 학급의 출결 기록을 불러오는 중입니다...</p>';
+  const {data:records,error:teacherError}=await authClient.from("attendance_records").select("attendance_date,status,checked_in_at,student_id,class_id").order("attendance_date",{ascending:false}).limit(200);
+  if(teacherError){
+   panel.textContent="담당 학급 출결을 불러오지 못했어요. 교사 계정의 class_members 등록과 attendance_records 조회 RLS 권한을 확인해야 합니다.";
+   return;
+  }
+  if(!records||records.length===0){
+   panel.innerHTML='<h3 style="font-size:16px;margin:0 0 8px">담당 학급 출결 기록</h3><p style="color:#718096;font-size:13px">조회 가능한 출결 기록이 없습니다. 담당 학급에 학생이 등록되어 있는지 확인해 주세요.</p>';
+   return;
+  }
+  const ids=[...new Set(records.map(r=>r.student_id))];
+  const {data:people,error:peopleError}=await authClient.from("profiles").select("id,display_name,student_number").in("id",ids);
+  if(peopleError){
+   panel.textContent="출결 기록은 확인했지만 학생 이름을 불러오지 못했어요. profiles 조회 정책을 확인해야 합니다.";
+   return;
+  }
+  const peopleById=new Map((people||[]).map(p=>[p.id,p]));
+  const summary=document.createElement("p");
+  summary.style.cssText="font-size:12px;color:#718096;margin:0 0 12px";
+  summary.textContent="조회 가능한 담당 학급 출결 "+records.length+"건";
+  panel.replaceChildren();
+  const heading=document.createElement("h3");heading.style.cssText="font-size:16px;margin:0 0 12px";heading.textContent="담당 학급 출결 기록";
+  panel.append(heading,summary);
+  const list=document.createElement("div");list.style.cssText="display:grid;gap:8px";
+  records.forEach(record=>{
+   const person=peopleById.get(record.student_id);
+   const item=document.createElement("div");item.style.cssText="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:11px 12px;border:1px solid #e6eaf1;border-radius:10px;font-size:13px";
+   const name=document.createElement("strong");name.textContent=person?.display_name||"등록 학생";
+   const status=document.createElement("strong");status.textContent=labels[record.status]||"기타";
+   const detail=document.createElement("span");detail.style.cssText="color:#718096;font-size:12px";detail.textContent=(person?.student_number?person.student_number+" · ":"")+record.attendance_date+" · 학급 "+record.class_id.slice(0,8);
+   const time=document.createElement("span");time.style.cssText="color:#718096;font-size:12px;text-align:right";time.textContent=record.checked_in_at?new Date(record.checked_in_at).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"";
+   item.append(name,status,detail,time);list.appendChild(item);
+  });
+  panel.appendChild(list);
   return;
  }
  panel.innerHTML='<h3 style="font-size:16px;margin:0 0 12px">내 출결 기록</h3><p style="color:#718096;font-size:13px">출결 기록을 불러오는 중입니다...</p>';
