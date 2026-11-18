@@ -1,4 +1,5 @@
 name: Deploy ATTEND AI preview
+# Preview deploy configured for GitHub Actions Pages source.
 
 on:
   push:
