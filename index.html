@@ -87,7 +87,7 @@
 <section class="page" id="page-checkin">
   <div class="heading"><div><div class="eyebrow">CHECK-IN / 03</div><h1>출석 인증</h1><p>학생증 QR 인증 또는 학생증 미소지 대체 확인 절차를 시작하세요.</p></div></div>
   <div class="layout">
-    <div class="panel"><div class="panel-head"><h2>학생증 QR 인증</h2><span class="tag blue">DEMO MODE</span></div><div class="panel-body center"><div class="qr-placeholder"></div><h3>QR 인증 시뮬레이터</h3><p>실제 카메라와 연결되지 않은 미리보기 화면입니다.<br>아래 버튼을 눌러 인증 흐름을 체험할 수 있어요.</p><button class="btn primary" onclick="simulateScan()">QR 인증 시뮬레이션</button><div id="scanResult"></div></div></div>
+    <div class="panel"><div class="panel-head"><h2>학생증 바코드 인증</h2><span class="tag blue">카메라 인식 테스트</span></div><div class="panel-body center"><div id="barcodeReader" style="width:100%;max-width:420px;margin:0 auto"></div><h3>학생증의 세로줄 바코드를 비춰 주세요</h3><p>카메라 권한을 허용하면 CODE 128, CODE 39, EAN 등 일반 바코드를 읽습니다.</p><button class="btn primary" id="startBarcode">카메라 켜기</button> <button class="btn secondary" id="stopBarcode" disabled>카메라 끄기</button><div id="scanResult" aria-live="polite"></div><p class="alert">현재 단계는 바코드 값 읽기 테스트입니다. 읽은 값은 출석으로 저장되지 않으며, 학생 계정과 학번을 안전하게 연결한 뒤 출석 처리 기능을 추가합니다.</p></div></div>
     <div class="panel"><div class="panel-head"><h2>학생증 미소지 대체 확인</h2></div><div class="panel-body"><p style="font-size:11px;color:var(--muted);line-height:1.7;margin-top:0">학생증이 없는 경우, 교사가 학생의 신원을 확인한 뒤 임시 출석 요청을 등록합니다. 교사 승인이 완료되기 전에는 출석이 확정되지 않습니다.</p><form id="fallbackForm"><div class="form-grid"><div class="field"><label>학생 이름</label><input id="fallbackName" required placeholder="예: 김하늘"></div><div class="field"><label>학번</label><input id="fallbackId" required placeholder="예: DEMO-001"></div><div class="field full"><label>확인 메모</label><textarea id="fallbackNote" placeholder="교사가 확인한 방법 (예: 학생증 사진 대조)"></textarea></div></div><div class="form-actions"><button class="btn primary">확인 요청 등록</button></div></form><div class="alert">안전 안내: 실제 운영에서는 교사 계정 권한 확인과 감사 로그가 필요합니다. 이 프로토타입은 인증 요청을 실제 서버에 저장하지 않습니다.</div></div></div>
   </div>
 </section>
@@ -119,6 +119,7 @@
 </div>
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 /* ATTEND_AUTH_GATE_V1 */
 const SUPABASE_URL="https://iamefmxdcydltatykqvi.supabase.co";
@@ -261,7 +262,25 @@ document.querySelectorAll("[data-role]").forEach(b=>b.addEventListener("click",(
 document.getElementById("mobileMenu").addEventListener("click",()=>document.getElementById("sidebar").classList.toggle("open"));
 document.getElementById("searchInput").addEventListener("input",renderAll);document.getElementById("statusFilter").addEventListener("change",renderAll);
 function toast(msg){let t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>t.classList.remove("show"),2600)}
-function simulateScan(){let el=document.getElementById("scanResult");el.innerHTML=`<div style="margin:16px auto 0;max-width:290px;padding:13px;border-radius:10px;background:#e8f7f1;color:#16866a;font-size:12px;line-height:1.6"><b>✓ 시뮬레이션 인증 완료</b><br>가상 학생 DEMO-001 · 08:59<br><small>실제 출석 기록은 저장되지 않았습니다.</small></div>`;toast("시연용 QR 인증이 완료되었어요.")}
+let barcodeScanner=null,barcodeRunning=false;
+document.getElementById("startBarcode").addEventListener("click",async()=>{
+ const result=document.getElementById("scanResult");
+ if(typeof Html5Qrcode==="undefined"){result.textContent="바코드 인식 라이브러리를 불러오지 못했어요. 페이지를 새로고침해 주세요.";return;}
+ if(barcodeRunning)return;
+ barcodeScanner=new Html5Qrcode("barcodeReader");
+ const formats=[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.CODE_93,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
+ try{
+  await barcodeScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:280,height:130},formatsToSupport:formats},async(decodedText)=>{
+   result.textContent="바코드 인식 성공 · 읽힌 값: "+decodedText+" / 아직 출석 기록에는 저장되지 않았습니다.";
+   if(barcodeRunning){barcodeRunning=false;document.getElementById("startBarcode").disabled=false;document.getElementById("stopBarcode").disabled=true;await barcodeScanner.stop();}
+  },()=>{});
+  barcodeRunning=true;document.getElementById("startBarcode").disabled=true;document.getElementById("stopBarcode").disabled=false;result.textContent="카메라가 켜졌어요. 바코드를 화면 중앙에 맞춰 주세요.";
+ }catch(err){result.textContent="카메라를 시작하지 못했어요. 브라우저의 카메라 권한과 HTTPS 연결을 확인해 주세요.";barcodeScanner=null;}
+});
+document.getElementById("stopBarcode").addEventListener("click",async()=>{
+ if(barcodeScanner&&barcodeRunning){await barcodeScanner.stop();barcodeRunning=false;}
+ document.getElementById("startBarcode").disabled=false;document.getElementById("stopBarcode").disabled=true;
+});
 document.getElementById("fallbackForm").addEventListener("submit",e=>{e.preventDefault();toast("대체 인증 요청을 시연용으로 등록했어요.");e.target.reset()});
 document.getElementById("requestForm").addEventListener("submit",e=>{e.preventDefault();requestItems.unshift({name:document.getElementById("reqName").value,type:document.getElementById("reqType").value,date:document.getElementById("reqDate").value});renderRequests();renderStats();e.target.reset();toast("신청이 시연용 목록에 추가되었어요.")});
 document.getElementById("correctionForm").addEventListener("submit",e=>{e.preventDefault();toast("정정 요청을 시연용으로 접수했어요.");e.target.reset()});
