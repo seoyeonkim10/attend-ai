@@ -15,9 +15,9 @@ if(typeof Html5Qrcode==="undefined"){msg.textContent="바코드 인식 라이브
 start.disabled=true;msg.textContent="카메라 연결 중...";
 try{
 const formats=[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
-scanner=new Html5Qrcode("reader",{formatsToSupport:formats,verbose:false});
-await scanner.start({facingMode:"environment"},{fps:10,qrbox:(w,h)=>({width:Math.min(280,Math.floor(w*.85)),height:Math.min(140,Math.floor(h*.5))})},async()=>{if(!active)return;active=false;updateCutoff();msg.textContent="바코드 인식 성공! 실제 출결 저장은 아직 연결되지 않았습니다.";await close();},()=>{});
-active=true;placeholder.style.display="none";box.classList.remove("idle");stop.disabled=false;msg.textContent="바코드를 카메라 화면 안에 맞춰 주세요.";
+scanner=new Html5Qrcode("reader",{formatsToSupport:formats,useBarCodeDetectorIfSupported:false,verbose:false});
+await scanner.start({facingMode:"environment"},{fps:12,aspectRatio:1.777778,disableFlip:false},async()=>{if(!active)return;active=false;updateCutoff();msg.textContent="바코드 인식 성공! 실제 출결 저장은 아직 연결되지 않았습니다.";await close();},()=>{});
+active=true;placeholder.style.display="none";box.classList.remove("idle");stop.disabled=false;msg.textContent="바코드의 양끝까지 화면에 들어오도록 가로 방향으로 비춰 주세요. 10~20cm 거리에서 초점을 맞춰 보세요.";
 }catch(e){await close();msg.textContent="카메라를 열지 못했습니다. Safari/Chrome 카메라 권한을 확인해 주세요.";}
 });
 stop.addEventListener("click",async()=>{await close();msg.textContent="카메라가 종료되었습니다.";});
