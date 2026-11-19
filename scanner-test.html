@@ -5,7 +5,7 @@
 <script>
 (()=>{
 const box=document.getElementById("camera"),msg=document.getElementById("message"),start=document.getElementById("start"),stop=document.getElementById("stop"),placeholder=document.getElementById("placeholder"),stats=document.getElementById("scanStats"),formatLabel=document.getElementById("barcodeFormat"),reader=document.getElementById("reader");
-let scanner=null,active=false,closing=false,scanStarted=0,scanCount=0,lastValue=null,lastSeen=0,feedbackTimer=null,audio=null;
+let scanner=null,active=false,closing=false,scanStarted=0,scanCount=0,decodeAttempts=0,lastValue=null,lastSeen=0,feedbackTimer=null,audio=null;
 function updateCutoff(){const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Seoul",weekday:"short",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date());const part=t=>parts.find(p=>p.type===t)?.value;const day=part("weekday"),time=Number(part("hour"))*60+Number(part("minute"));const limit=day==="Wed"?12*60+55:8*60+25;const el=document.getElementById("cutoff");el.textContent=day==="Sat"||day==="Sun"?"오늘은 주말입니다. 주말 출결 기준은 아직 정해지지 않았습니다.":time<=limit?"현재 기준: 출석 시간대":"현재 기준: 지각 시간대 (인정 여부는 교사 확인)";}
 updateCutoff();
 function beep(){try{if(!audio)return;const o=audio.createOscillator(),g=audio.createGain();o.type="sine";o.frequency.value=880;g.gain.setValueAtTime(.06,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.13);o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+.14);}catch(e){}}
@@ -18,7 +18,7 @@ try{const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(Au
 try{
 const formats=[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
 scanner=new Html5Qrcode("reader",{formatsToSupport:formats,useBarCodeDetectorIfSupported:false,verbose:false});
-await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false,videoConstraints:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}},(decodedText,decodedResult)=>{
+await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false},(decodedText,decodedResult)=>{
 if(!active)return;
 const now=performance.now();
 // Suppress rapid duplicate reads of the same badge, but allow the next distinct badge immediately.
@@ -32,8 +32,8 @@ msg.textContent="✓ 바코드 인식 성공! 다음 학생증을 스캔하세�
 msg.parentElement.classList.add("scan-ok");beep();
 clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>{msg.parentElement.classList.remove("scan-ok");if(active)msg.textContent="다음 학생증을 비춰 주세요.";},1100);
 scanStarted=performance.now();
-},()=>{});
-active=true;scanStarted=performance.now();scanCount=0;lastValue=null;lastSeen=0;stats.textContent="인식 횟수: 0 · 마지막 인식 시간: -";formatLabel.textContent="바코드 규격: 아직 확인되지 않음";placeholder.style.display="none";box.classList.remove("idle");stop.disabled=false;msg.textContent="연속 스캔 중 · 바코드 양끝이 화면 안에 들어오게 비춰 주세요. 인식 후 카메라는 계속 켜집니다.";
+},()=>{decodeAttempts++;if(active&&decodeAttempts%40===0&&scanCount===0){msg.textContent="카메라 영상 분석 중 ("+decodeAttempts+"회) · 바코드 전체와 양쪽 여백이 화면 안에 들어오게 해 주세요.";}});
+active=true;scanStarted=performance.now();scanCount=0;decodeAttempts=0;lastValue=null;lastSeen=0;stats.textContent="인식 횟수: 0 · 마지막 인식 시간: -";formatLabel.textContent="바코드 규격: 아직 확인되지 않음";placeholder.style.display="none";box.classList.remove("idle");stop.disabled=false;msg.textContent="연속 스캔 중 · 바코드 양끝이 화면 안에 들어오게 비춰 주세요. 인식 후 카메라는 계속 켜집니다.";
 }catch(e){await close();msg.textContent="카메라를 열지 못했습니다. Safari/Chrome 카메라 권한을 확인해 주세요.";}
 });
 stop.addEventListener("click",async()=>{await close();msg.textContent="카메라가 종료되었습니다.";});
