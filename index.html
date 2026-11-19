@@ -21,6 +21,32 @@
 .auth-message{font-size:12px;line-height:1.6;color:#b54747;min-height:20px;margin-top:12px}.auth-note{font-size:11px;color:#98a2b3;line-height:1.6;margin-top:20px}
 .auth-result{min-height:100vh;display:grid;place-items:start center;padding:24px;background:#f5f7fb}.auth-result-card{width:min(100%,1080px);background:#fff;border:1px solid #e6eaf1;border-radius:18px;padding:30px;box-shadow:0 18px 55px rgba(23,32,51,.07)}.auth-result-card h2{margin:0 0 10px;color:#172033}.auth-result-card p{color:#667085;font-size:13px;line-height:1.7}.auth-signout{border:1px solid #dfe5ef;background:#fff;border-radius:9px;padding:10px 15px;font-weight:700;cursor:pointer}
 
+
+/* Student attendance dashboard */
+.auth-result-card:has(.student-dashboard){max-width:1060px;padding:clamp(22px,4vw,44px)}
+.student-dashboard{margin-top:26px!important;font-family:inherit}
+.student-intro{padding:25px 28px;border-radius:18px;background:linear-gradient(120deg,#23396f,#4968e8);color:#fff;margin-bottom:18px}
+.student-eyebrow{font-size:10px;letter-spacing:2px;font-weight:800;opacity:.75;margin-bottom:10px}
+.student-intro h3{font-size:24px;letter-spacing:-.7px;margin:0 0 6px;color:#fff}
+.student-intro p{font-size:13px!important;color:#e3eaff!important;margin:0!important}
+.student-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.student-stat{padding:20px 18px;background:#fff;border:1px solid #e7ebf4;border-radius:15px;box-shadow:0 4px 16px rgba(30,49,100,.035)}
+.student-stat>span{display:block;color:#78849b;font-size:12px;font-weight:650;margin-bottom:10px}
+.student-stat strong{font-size:29px;line-height:1;color:#172033;font-weight:800}
+.student-stat .student-unit{font-size:12px;color:#8993a7;margin-left:5px}
+.student-stat.present strong{color:#16866a}.student-stat.late strong{color:#b7791f}.student-stat.absent strong{color:#c94f5d}
+.student-history{border:1px solid #e7ebf4;border-radius:17px;overflow:hidden;background:#fff}
+.student-history-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:21px 22px;background:#fafbff;border-bottom:1px solid #edf0f7}
+.student-history-heading h4{margin:0;font-size:16px;color:#172033}.student-history-heading span{font-size:12px;color:#8993a7}
+.student-record{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:17px 22px;border-bottom:1px solid #f0f2f7}
+.student-record:last-child{border-bottom:0}.student-record-left{display:flex;align-items:center;gap:13px;min-width:0}
+.student-record-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:#eef7f4;color:#16866a;font-weight:800;font-size:17px;flex-shrink:0}
+.student-record-icon.late{background:#fff7e9;color:#b7791f}.student-record-icon.absent{background:#fff0f1;color:#c94f5d}.student-record-icon.needs_review{background:#eef1ff;color:#4968e8}
+.student-record-left strong{display:block;font-size:14px;color:#243047}.student-record-left small{display:block;color:#8792a5;font-size:11px;margin-top:4px}
+.student-status{font-size:12px;font-weight:750;border-radius:20px;padding:7px 12px;background:#eaf7f2;color:#16866a;white-space:nowrap}
+.student-status.late{background:#fff5e4;color:#a96c18}.student-status.absent{background:#fff0f1;color:#c94f5d}.student-status.needs_review{background:#eef1ff;color:#4968e8}
+.student-empty,.student-loading{padding:24px!important;color:#718096!important}
+@media(max-width:620px){.student-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.student-intro{padding:22px}.student-intro h3{font-size:21px}.student-stat{padding:16px}.student-history-heading,.student-record{padding:15px}}
 </style>
 </head>
 <body>
@@ -310,33 +336,44 @@ async function showAuthenticatedUser(user){
   await renderTeacherDashboard(panel);
   return;
  }
- panel.innerHTML='<h3 style="font-size:16px;margin:0 0 12px">내 출결 기록</h3><p style="color:#718096;font-size:13px">출결 기록을 불러오는 중입니다...</p>';
+ panel.classList.add("student-dashboard");
+ panel.replaceChildren();
+ const intro=document.createElement("div");intro.className="student-intro";
+ const eyebrow=document.createElement("div");eyebrow.className="student-eyebrow";eyebrow.textContent="MY ATTENDANCE";
+ const title=document.createElement("h3");title.textContent="내 출결 현황";
+ const subtitle=document.createElement("p");subtitle.textContent="학교에 기록된 나의 출결을 한눈에 확인하세요.";
+ intro.append(eyebrow,title,subtitle);panel.append(intro);
+ const loading=document.createElement("p");loading.className="student-loading";loading.textContent="출결 기록을 불러오는 중입니다...";panel.append(loading);
  const {data:records,error:attendanceError}=await authClient.from("attendance_records").select("attendance_date,status,checked_in_at").eq("student_id",user.id).order("attendance_date",{ascending:false}).limit(100);
- if(attendanceError){
-  panel.textContent="출결 기록을 불러오지 못했어요. attendance_records 조회 권한과 RLS 설정을 확인해야 합니다.";
-  return;
- }
- if(!records||records.length===0){
-  panel.innerHTML='<h3 style="font-size:16px;margin:0 0 8px">내 출결 기록</h3><p style="color:#718096;font-size:13px">등록된 출결 기록이 아직 없습니다.</p>';
-  return;
- }
-
- const counts=records.reduce((a,r)=>{a[r.status]=(a[r.status]||0)+1;return a;},{});
- const summary=document.createElement("p");
- summary.style.cssText="font-size:12px;color:#718096;margin:0 0 12px";
- summary.textContent="최근 "+records.length+"건 · 출석 "+(counts.present||0)+" · 지각 "+(counts.late||0)+" · 결석 "+(counts.absent||0)+" · 확인 필요 "+(counts.needs_review||0);
- panel.appendChild(summary);
- const list=document.createElement("div");list.style.cssText="display:grid;gap:8px";
- records.forEach(record=>{
-  const item=document.createElement("div");
-  item.style.cssText="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:11px 12px;border:1px solid #e6eaf1;border-radius:10px;font-size:13px";
-  const date=document.createElement("span");date.textContent=record.attendance_date||"날짜 미상";
-  const status=document.createElement("strong");status.textContent=labels[record.status]||"기타";
-  const time=document.createElement("span");time.style.cssText="color:#718096;font-size:12px";time.textContent=record.checked_in_at?new Date(record.checked_in_at).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"";
-  const right=document.createElement("span");right.style.cssText="display:flex;gap:12px;align-items:center";right.append(status,time);
-  item.append(date,right);list.appendChild(item);
+ loading.remove();
+ if(attendanceError){const p=document.createElement("p");p.className="student-loading";p.textContent="출결 기록을 불러오지 못했어요. 관리자에게 조회 권한 확인을 요청해 주세요.";panel.append(p);return;}
+ const counts=(records||[]).reduce((a,r)=>{a[r.status]=(a[r.status]||0)+1;return a;},{});
+ const stats=document.createElement("div");stats.className="student-stats";
+ [["전체 기록",(records||[]).length,"all"],["출석",counts.present||0,"present"],["지각",counts.late||0,"late"],["결석",counts.absent||0,"absent"]].forEach(([label,value,kind])=>{
+  const card=document.createElement("div");card.className="student-stat "+kind;
+  const small=document.createElement("span");small.textContent=label;
+  const big=document.createElement("strong");big.textContent=value;
+  const unit=document.createElement("span");unit.className="student-unit";unit.textContent="건";
+  const line=document.createElement("div");line.append(big,unit);card.append(small,line);stats.append(card);
  });
- panel.appendChild(list);
+ panel.append(stats);
+ const section=document.createElement("section");section.className="student-history";
+ const heading=document.createElement("div");heading.className="student-history-heading";
+ const h=document.createElement("h4");h.textContent="최근 출결 기록";
+ const count=document.createElement("span");count.textContent="최근 "+(records||[]).length+"건";
+ heading.append(h,count);section.append(heading);
+ if(!records||records.length===0){const empty=document.createElement("p");empty.className="student-empty";empty.textContent="아직 등록된 출결 기록이 없습니다.";section.append(empty);}
+ else records.forEach(record=>{
+  const item=document.createElement("div");item.className="student-record";
+  const left=document.createElement("div");left.className="student-record-left";
+  const icon=document.createElement("span");icon.className="student-record-icon "+record.status;icon.textContent=record.status==="present"?"✓":record.status==="late"?"◷":record.status==="absent"?"−":"!";
+  const info=document.createElement("div");const date=document.createElement("strong");date.textContent=record.attendance_date||"날짜 미상";
+  const detail=document.createElement("small");detail.textContent=record.checked_in_at?"기록 시간 "+new Date(record.checked_in_at).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"}):"출결 기록";
+  info.append(date,detail);left.append(icon,info);
+  const status=document.createElement("span");status.className="student-status "+record.status;status.textContent=labels[record.status]||"기타";
+  item.append(left,status);section.append(item);
+ });
+ panel.append(section);
 }
 authForm.addEventListener("submit",async event=>{
  event.preventDefault();authError("");authSubmit.disabled=true;authSubmit.textContent="로그인 확인 중...";
