@@ -18,7 +18,7 @@ try{const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(Au
 try{
 const formats=[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
 scanner=new Html5Qrcode("reader",{formatsToSupport:formats,useBarCodeDetectorIfSupported:false,verbose:false});
-await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false},decodedText=>{
+await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false,videoConstraints:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}},decodedText=>{
 if(!active)return;
 const now=performance.now();
 // Suppress rapid duplicate reads of the same badge, but allow the next distinct badge immediately.
