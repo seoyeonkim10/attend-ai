@@ -141,7 +141,7 @@ async function renderTeacherDashboard(panel){
  const desc=document.createElement("p");desc.textContent="담당 학생과 출결 현황을 확인합니다.";desc.style.cssText="margin:0;color:#718096;font-size:13px";heading.append(h,desc);
  const refresh=document.createElement("button");refresh.textContent="새로고침";styleButton(refresh,false);refresh.addEventListener("click",()=>renderTeacherDashboard(panel));header.append(heading,refresh);
  const tabs=document.createElement("div");tabs.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0";
- const attendanceTab=document.createElement("button"),studentsTab=document.createElement("button"),classesTab=document.createElement("button");attendanceTab.textContent="출결 현황";studentsTab.textContent="학생 관리";classesTab.textContent="학급 관리";styleButton(attendanceTab,true);styleButton(studentsTab,false);styleButton(classesTab,false);tabs.append(attendanceTab,studentsTab);
+ const attendanceTab=document.createElement("button"),studentsTab=document.createElement("button"),classesTab=document.createElement("button");attendanceTab.textContent="출결 현황";studentsTab.textContent="학생 관리";classesTab.textContent="학급 관리";styleButton(attendanceTab,true);styleButton(studentsTab,false);styleButton(classesTab,false);tabs.append(attendanceTab,studentsTab,classesTab);
  const body=document.createElement("div");panel.append(header,tabs,body);
  const {data:me,error:meError}=await authClient.from("profiles").select("school_id").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
  if(meError||!me?.school_id){body.textContent="교사 프로필의 학교 정보를 확인할 수 없습니다. profiles의 school_id와 조회 권한을 확인해 주세요.";return;}
