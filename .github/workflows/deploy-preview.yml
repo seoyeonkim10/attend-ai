@@ -44,6 +44,7 @@ jobs:
           cp preview-source/index.html public/preview/admin-test.html
           cp preview-source/scanner-test.html public/preview/scanner-test.html
           cp preview-source/scanner-native-test.html public/preview/scanner-native-test.html
+          cp preview-source/scanner-quagga-test.html public/preview/scanner-quagga-test.html
           touch public/.nojekyll
 
       - name: Configure Pages
