@@ -16,7 +16,7 @@ if(typeof Html5Qrcode==="undefined"){msg.textContent="바코드 인식 라이브
 start.disabled=true;msg.textContent="카메라 연결 중...";
 try{const AudioContextClass=window.AudioContext||window.webkitAudioContext;if(AudioContextClass){audio=audio||new AudioContextClass();audio.resume().catch(()=>{});}}catch(e){}
 try{
-const formats=[Html5QrcodeSupportedFormats.CODE_128];
+const formats=[Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.ITF,Html5QrcodeSupportedFormats.CODABAR,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E];
 scanner=new Html5Qrcode("reader",{formatsToSupport:formats,useBarCodeDetectorIfSupported:false,verbose:false});
 await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false,videoConstraints:{facingMode:"environment",width:{ideal:1920},height:{ideal:1080}}},(decodedText,decodedResult)=>{
 if(!active)return;
