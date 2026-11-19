@@ -140,11 +140,65 @@ async function renderTeacherDashboard(panel){
  const desc=document.createElement("p");desc.textContent="담당 학생과 출결 현황을 확인합니다.";desc.style.cssText="margin:0;color:#718096;font-size:13px";heading.append(h,desc);
  const refresh=document.createElement("button");refresh.textContent="새로고침";styleButton(refresh,false);refresh.addEventListener("click",()=>renderTeacherDashboard(panel));header.append(heading,refresh);
  const tabs=document.createElement("div");tabs.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0";
- const attendanceTab=document.createElement("button"),studentsTab=document.createElement("button");attendanceTab.textContent="출결 현황";studentsTab.textContent="학생 관리";styleButton(attendanceTab,true);styleButton(studentsTab,false);tabs.append(attendanceTab,studentsTab);
+ const attendanceTab=document.createElement("button"),studentsTab=document.createElement("button"),classesTab=document.createElement("button");attendanceTab.textContent="출결 현황";studentsTab.textContent="학생 관리";classesTab.textContent="학급 관리";styleButton(attendanceTab,true);styleButton(studentsTab,false);styleButton(classesTab,false);tabs.append(attendanceTab,studentsTab);
  const body=document.createElement("div");panel.append(header,tabs,body);
  const {data:me,error:meError}=await authClient.from("profiles").select("school_id").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
  if(meError||!me?.school_id){body.textContent="교사 프로필의 학교 정보를 확인할 수 없습니다. profiles의 school_id와 조회 권한을 확인해 주세요.";return;}
  const {data:students,error:studentError}=await authClient.from("profiles").select("id,display_name,student_number,is_active").eq("school_id",me.school_id).eq("role","student").order("student_number",{ascending:true}).limit(500);
+ const {data:adminProfile,error:adminError}=await authClient.from("profiles").select("is_school_admin").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
+ const canManage=!adminError&&adminProfile?.is_school_admin===true;
+ if(!canManage)classesTab.remove();
+ const classesView=async()=>{
+  if(!canManage)return;
+  [attendanceTab,studentsTab,classesTab].forEach((b,i)=>styleButton(b,i===2));
+  body.replaceChildren();
+  const heading=document.createElement("h3");heading.textContent="학급 관리";heading.style.cssText="margin:12px 0;font-size:18px";
+  const info=document.createElement("p");info.textContent="관리자 권한으로 학급을 생성하고 기존 학교 계정을 학급에 배정합니다. 새 로그인 계정 생성은 아직 지원하지 않습니다.";info.style.cssText="color:#718096;font-size:13px;line-height:1.7";
+  const makeBox=document.createElement("div");makeBox.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0";
+  const className=document.createElement("input");className.placeholder="학급 이름 (예: 테스트 1반)";className.maxLength=80;className.style.cssText="flex:1;min-width:190px;padding:11px;border:1px solid #dfe5ef;border-radius:9px";
+  const create=document.createElement("button");create.textContent="＋ 학급 생성";styleButton(create,true);makeBox.append(className,create);
+  const classList=document.createElement("div");classList.style.cssText="margin:14px 0;padding:14px;border:1px solid #e6eaf1;border-radius:12px;background:#fff";
+  const assignTitle=document.createElement("h4");assignTitle.textContent="기존 계정 학급 배정";assignTitle.style.cssText="margin:18px 0 10px";
+  const assignBox=document.createElement("div");assignBox.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px";
+  const classSelect=document.createElement("select"),memberRole=document.createElement("select"),memberId=document.createElement("input"),assign=document.createElement("button");
+  for(const el of [classSelect,memberRole,memberId])el.style.cssText="padding:11px;border:1px solid #dfe5ef;border-radius:9px;min-width:0";
+  for(const [value,label] of [["teacher","교사"],["student","학생"]]){const opt=document.createElement("option");opt.value=value;opt.textContent=label;memberRole.append(opt);}
+  memberId.placeholder="기존 계정의 사용자 UUID";memberId.autocomplete="off";assign.textContent="학급에 배정";styleButton(assign,true);assignBox.append(classSelect,memberRole,memberId,assign);
+  const feedback=document.createElement("p");feedback.style.cssText="font-size:13px;color:#667085;line-height:1.7;white-space:pre-wrap";
+  const members=document.createElement("div");members.style.cssText="margin:12px 0;padding:14px;border:1px solid #e6eaf1;border-radius:12px;background:#fff";
+  body.append(heading,info,makeBox,classList,assignTitle,assignBox,feedback,members);
+  const load=async()=>{
+   const {data:rows,error}=await authClient.from("classes").select("id,name").eq("school_id",me.school_id).order("name");
+   if(error){classList.textContent="학급을 불러오지 못했습니다: "+error.message;return;}
+   classSelect.replaceChildren();classList.replaceChildren();
+   const title=document.createElement("strong");title.textContent="등록된 학급 ("+(rows||[]).length+"개)";classList.append(title);
+   for(const c of rows||[]){const opt=document.createElement("option");opt.value=c.id;opt.textContent=c.name;classSelect.append(opt);const item=document.createElement("p");item.textContent=c.name+" · "+c.id;item.style.cssText="font-size:12px;overflow-wrap:anywhere";classList.append(item);}
+   if(!rows?.length){const p=document.createElement("p");p.textContent="아직 학급이 없습니다. 위에서 먼저 학급을 만들어 주세요.";classList.append(p);}
+   assign.disabled=!rows?.length;
+   await loadMembers();
+  };
+  const loadMembers=async()=>{
+   members.replaceChildren();const title=document.createElement("strong");title.textContent="선택 학급 구성원";members.append(title);
+   if(!classSelect.value)return;
+   const {data:links,error}=await authClient.from("class_members").select("user_id,member_role").eq("class_id",classSelect.value);
+   if(error){const p=document.createElement("p");p.textContent="구성원 조회 실패: "+error.message;members.append(p);return;}
+   if(!links?.length){const p=document.createElement("p");p.textContent="아직 배정된 계정이 없습니다.";members.append(p);return;}
+   for(const link of links){const row=document.createElement("div");row.style.cssText="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px";const label=document.createElement("span");label.textContent=(link.member_role==="teacher"?"교사":"학생")+" · "+link.user_id;label.style.overflowWrap="anywhere";const remove=document.createElement("button");remove.textContent="배정 해제";styleButton(remove,false);remove.addEventListener("click",async()=>{if(!confirm("이 계정의 학급 배정을 해제할까요?"))return;const {error:e}=await authClient.from("class_members").delete().eq("class_id",classSelect.value).eq("user_id",link.user_id);feedback.textContent=e?"배정 해제 실패: "+e.message:"배정을 해제했습니다.";if(!e)await loadMembers();});row.append(label,remove);members.append(row);}
+  };
+  create.addEventListener("click",async()=>{
+   const name=className.value.trim();if(!name){feedback.textContent="학급 이름을 입력해 주세요.";return;}
+   create.disabled=true;const {error}=await authClient.from("classes").insert({school_id:me.school_id,name});create.disabled=false;
+   feedback.textContent=error?"학급 생성 실패: "+error.message:"학급을 생성했습니다.";if(!error){className.value="";await load();}
+  });
+  assign.addEventListener("click",async()=>{
+   const id=memberId.value.trim();if(!classSelect.value){feedback.textContent="학급을 먼저 생성해 주세요.";return;}
+   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)){feedback.textContent="기존 계정의 올바른 사용자 UUID를 입력해 주세요.";return;}
+   assign.disabled=true;const {error}=await authClient.from("class_members").insert({class_id:classSelect.value,user_id:id,member_role:memberRole.value});assign.disabled=false;
+   feedback.textContent=error?"배정 실패: "+error.message+" (계정의 학교·역할 및 권한을 확인해 주세요.)":"계정을 학급에 배정했습니다.";if(!error){memberId.value="";await loadMembers();}
+  });
+  classSelect.addEventListener("change",loadMembers);
+  await load();
+ };
  const attendanceView=async()=>{
   attendanceTab.style.background="#eef1ff";attendanceTab.style.borderColor="#4968e8";attendanceTab.style.color="#4968e8";
   studentsTab.style.background="#fff";studentsTab.style.borderColor="#dfe5ef";studentsTab.style.color="#475467";
@@ -230,7 +284,7 @@ async function renderTeacherDashboard(panel){
   const render=()=>{tbody.replaceChildren();const q=search.value.trim().toLowerCase();const rows=list.filter(p=>(p.display_name||"").toLowerCase().includes(q)||(p.student_number||"").toLowerCase().includes(q));count.textContent=rows.length+"명 표시 · 전체 학교 학생 "+list.length+"명 중 교사에게 허용된 계정";rows.forEach(p=>{const tr=document.createElement("tr");[p.display_name||"이름 없음",p.student_number||"학번 미등록",p.is_active?"활성":"비활성"].forEach((v,i)=>{const td=document.createElement("td");td.textContent=v;td.style.cssText="padding:13px;border-bottom:1px solid #eef1f5";if(i===2){td.style.color=p.is_active?"#16866a":"#c94f5d";td.style.fontWeight="700"}tr.append(td)});tbody.append(tr)});if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=3;td.textContent=list.length?"검색 결과가 없습니다.":"아직 조회할 수 있는 학생이 없습니다. 학생 계정이 생성되고 교사 담당 학급에 배정되면 여기에 표시됩니다.";td.style.cssText="padding:22px;text-align:center;color:#718096;white-space:normal";tr.append(td);tbody.append(tr)}};
   search.addEventListener("input",render);render();
  };
- attendanceTab.addEventListener("click",attendanceView);studentsTab.addEventListener("click",studentsView);
+ attendanceTab.addEventListener("click",attendanceView);studentsTab.addEventListener("click",studentsView);classesTab.addEventListener("click",classesView);
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
  await attendanceView();
 }
