@@ -42,6 +42,7 @@ jobs:
           cp main-site/index.html public/index.html
           cp preview-source/index.html public/preview/index.html
           cp preview-source/index.html public/preview/admin-test.html
+          cp preview-source/scanner-test.html public/preview/scanner-test.html
           touch public/.nojekyll
 
       - name: Configure Pages
