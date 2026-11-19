@@ -41,6 +41,7 @@ jobs:
           mkdir -p public/preview
           cp main-site/index.html public/index.html
           cp preview-source/index.html public/preview/index.html
+          cp preview-source/index.html public/preview/admin-test.html
           touch public/.nojekyll
 
       - name: Configure Pages
