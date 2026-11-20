@@ -28,3 +28,27 @@ create policy "assigned teacher reviews requests" on public.attendance_requests 
  using (private.is_teacher_for_class(class_id))
  with check (private.is_teacher_for_class(class_id));
 -- Do not add public/anon policies. Student cannot update review status.
+
+-- Prevent teacher-side edits to the student's original request.
+create or replace function public.attendo_protect_request_review()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+ if (new.student_id,new.class_id,new.attendance_date,new.request_type,new.reason,new.created_at)
+    is distinct from (old.student_id,old.class_id,old.attendance_date,old.request_type,old.reason,old.created_at) then
+  raise exception 'Original attendance request cannot be edited';
+ end if;
+ if old.review_status <> 'pending' then
+  raise exception 'Already reviewed requests cannot be changed';
+ end if;
+ if new.review_status not in ('approved','rejected') then
+  raise exception 'Review must be approved or rejected';
+ end if;
+ if new.reviewed_by is distinct from (select auth.uid()) then
+  raise exception 'Reviewer must be the current user';
+ end if;
+ new.reviewed_at := now();
+ return new;
+end; $$;
+drop trigger if exists attendo_protect_request_review on public.attendance_requests;
+create trigger attendo_protect_request_review before update on public.attendance_requests
+for each row execute function public.attendo_protect_request_review();
