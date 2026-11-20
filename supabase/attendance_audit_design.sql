@@ -1,0 +1,31 @@
+-- ATTENDO audit log proposal - REVIEW ONLY, DO NOT EXECUTE WITHOUT APPROVAL.
+-- Prerequisites: export public.attendance_records to CSV; verify existing triggers/functions.
+-- This is a draft for test environment, not a production-ready migration.
+-- The existing attendance_records table is not altered or deleted.
+--
+-- Before execution, verify the exact attendance_records schema and whether
+-- existing audit triggers or correction_reason_input already implement history.
+-- A migration should capture old/new status, actor auth.uid(), timestamps,
+-- and change reason, and must be tested with student and teacher RLS roles.
+--
+-- Proposed table structure (not yet deployed):
+-- public.attendance_change_log (
+--   id uuid primary key default gen_random_uuid(),
+--   attendance_record_id uuid not null references public.attendance_records(id),
+--   actor_id uuid references public.profiles(id),
+--   action text not null check (action in ('insert','update','delete')),
+--   old_values jsonb,
+--   new_values jsonb,
+--   changed_at timestamptz not null default now()
+-- )
+--
+-- SECURITY REQUIREMENTS:
+-- 1. Only a SECURITY DEFINER trigger should write the log; no client INSERT.
+-- 2. Revoke UPDATE/DELETE on the log from anon/authenticated.
+-- 3. Grant SELECT only with carefully scoped RLS policies (assigned teacher,
+--    school admin) using existing tested helpers.
+-- 4. Use a dedicated protected schema if the app's privilege model requires it.
+-- 5. Test change history against existing attendance_records triggers.
+-- 6. Decide whether old/new JSON may contain personal data and minimize fields.
+-- 7. Preserve logs on record deletion according to retention requirements.
+-- 8. Do not treat a UI display as proof of immutable server-side auditing.
