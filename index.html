@@ -311,6 +311,27 @@ async function renderTeacherDashboard(panel){
     item.append(heading,reason,actions,feedback);requestsList.append(item);
    });
   }
+ const reviewedSection=document.createElement("section");reviewedSection.style.cssText="border:1px solid #e6eaf1;background:#fff;border-radius:12px;padding:16px;margin:14px 0";
+ const reviewedHeading=document.createElement("h3");reviewedHeading.textContent="최근 사유 신청 처리 내역";reviewedHeading.style.cssText="font-size:16px;margin:0 0 8px";
+ const reviewedInfo=document.createElement("p");reviewedInfo.textContent="승인·반려 내역은 실제 출결 기록과 별개입니다.";reviewedInfo.style.cssText="font-size:12px;color:#718096;margin:0 0 12px";
+ const reviewedList=document.createElement("div");reviewedList.style.cssText="display:grid;gap:8px";
+ reviewedSection.append(reviewedHeading,reviewedInfo,reviewedList);body.insertBefore(reviewedSection,filters);
+ const {data:reviewedRequests,error:reviewedError}=await authClient.from("attendance_requests").select("student_id,attendance_date,request_type,review_status,reviewed_at").in("review_status",["approved","rejected"]).order("reviewed_at",{ascending:false}).limit(30);
+ if(reviewedError){reviewedInfo.textContent="처리 내역을 불러오지 못했습니다. ("+(reviewedError.message||"조회 오류")+")";}
+ else if(!reviewedRequests?.length){reviewedInfo.textContent="아직 처리 완료된 신청이 없습니다.";}
+ else {
+  const reviewedIds=[...new Set(reviewedRequests.map(r=>r.student_id))];
+  const {data:reviewedProfiles}=await authClient.from("profiles").select("id,display_name").in("id",reviewedIds);
+  const reviewedNames=new Map((reviewedProfiles||[]).map(p=>[p.id,p.display_name||"학생"]));
+  reviewedRequests.forEach(r=>{
+   const item=document.createElement("div");item.style.cssText="border:1px solid #e6eaf1;border-radius:9px;padding:11px;font-size:13px;overflow-wrap:anywhere";
+   const result=r.review_status==="approved"?"승인":"반려";
+   const type=({tardy:"지각",absence:"결석",correction:"정정"}[r.request_type]||"신청");
+   const when=r.reviewed_at?new Date(r.reviewed_at).toLocaleString("ko-KR"):"처리 시간 확인 필요";
+   item.textContent=(reviewedNames.get(r.student_id)||"학생")+" · "+r.attendance_date+" · "+type+" · "+result+" · "+when;
+   reviewedList.append(item);
+  });
+ }
  const {data:records,error}=await authClient.from("attendance_records").select("id,attendance_date,status,checked_in_at,student_id,class_id,reason_type,reason_note,document_status,review_status,reviewed_at").order("attendance_date",{ascending:false}).limit(500);
   if(error){message.textContent="출결 데이터를 불러오지 못했습니다. 담당 학급 등록과 출결 조회 권한을 확인해 주세요.";wrap.style.display="none";return;}
   if(!records?.length){filters.style.display="none";stats.style.display="none";wrap.style.display="none";message.style.cssText="margin-top:14px;padding:22px;border:1px dashed #cfd7e6;border-radius:12px;background:#fafbfe;color:#667085;font-size:13px;line-height:1.8";message.textContent="아직 출결 기록이 없습니다. 현재 화면의 날짜·학생 검색은 기존 기록을 찾는 필터이며, 출결을 새로 입력하는 기능은 아닙니다. 학생 등록과 학급 배정, 출결 생성 기능은 아직 연결되지 않았습니다.";return;}
