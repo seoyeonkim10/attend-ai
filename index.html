@@ -435,7 +435,7 @@ async function renderTeacherDashboard(panel){
   [attendanceTab,studentsTab,auditTab,classesTab,accountsTab].forEach(b=>styleButton(b,b===accountsTab));
   body.replaceChildren();
   const heading=document.createElement("h3");heading.textContent="학교 계정 관리";heading.style.cssText="font-size:18px;margin:14px 0 8px";
-  const desc=document.createElement("p");desc.textContent="같은 학교에서 조회 권한이 허용된 계정만 표시합니다. 현재는 읽기 전용이며 계정 상태나 권한을 변경하지 않습니다.";desc.style.cssText="font-size:13px;color:#718096;line-height:1.7";
+  const desc=document.createElement("p");desc.textContent="같은 학교에서 조회 권한이 허용된 계정만 표시합니다. 관리자는 같은 학교의 일반 계정을 활성화하거나 비활성화할 수 있습니다. 관리자 계정은 변경할 수 없습니다.";desc.style.cssText="font-size:13px;color:#718096;line-height:1.7";
   const controls=document.createElement("div");controls.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0";
   const search=document.createElement("input");search.type="search";search.placeholder="이름 또는 학번 검색";search.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:9px;flex:1;min-width:160px";
   const role=document.createElement("select");role.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:9px";
@@ -445,17 +445,32 @@ async function renderTeacherDashboard(panel){
   controls.append(search,role,status);
   const count=document.createElement("p");count.style.cssText="font-size:12px;color:#718096";
   const list=document.createElement("div");list.style.cssText="display:grid;gap:8px";body.append(heading,desc,controls,count,list);
-  const {data:accounts,error}=await authClient.from("profiles").select("id,display_name,student_number,role,is_active,is_school_admin").eq("school_id",me.school_id).order("display_name").limit(500);
+  let {data:accounts,error}=await authClient.from("profiles").select("id,display_name,student_number,role,is_active,is_school_admin").eq("school_id",me.school_id).order("display_name").limit(500);
   if(error){count.textContent="계정 목록을 불러오지 못했습니다: "+error.message;return;}
+  const awaitedUserId=(await authClient.auth.getUser()).data.user?.id;
   const render=()=>{
    list.replaceChildren();const q=search.value.trim().toLocaleLowerCase("ko-KR");
    const rows=(accounts||[]).filter(a=>(role.value==="all"||a.role===role.value)&&(status.value==="all"||(status.value==="active"&&a.is_active)||(status.value==="inactive"&&!a.is_active))&&((a.display_name||"").toLocaleLowerCase("ko-KR").includes(q)||(a.student_number||"").toLocaleLowerCase("ko-KR").includes(q)));
-   count.textContent="조회된 계정 "+rows.length+"개 · 현재 화면은 읽기 전용입니다.";
+   count.textContent="조회된 계정 "+rows.length+"개 · 관리자 계정 변경 불가";
    if(!rows.length){const p=document.createElement("p");p.textContent="조건에 맞는 계정이 없습니다.";list.append(p);return;}
    for(const a of rows){const item=document.createElement("div");item.style.cssText="border:1px solid #e6eaf1;background:#fff;border-radius:10px;padding:12px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap";
     const name=document.createElement("strong");name.textContent=a.display_name||"이름 없음";
     const details=document.createElement("span");details.style.cssText="color:#667085;font-size:12px";details.textContent=(a.role==="student"?"학생":a.role==="teacher"?"교사":a.role==="admin"?"관리자":a.role)+(a.is_school_admin?" · 학교 관리자":"")+(a.student_number?" · 학번 "+a.student_number:"")+" · "+(a.is_active?"활성":"비활성");
-    item.append(name,details);list.append(item);
+    const info=document.createElement("div");info.style.cssText="display:grid;gap:4px";info.append(name,details);item.append(info);
+    if(a.id!==awaitedUserId&&a.role!=="admin"&&a.is_school_admin!==true){
+     const toggle=document.createElement("button");toggle.textContent=a.is_active?"비활성화":"다시 활성화";toggle.style.cssText="padding:9px 12px;border:1px solid #dfe5ef;border-radius:8px;background:#fff;color:#172033";
+     toggle.addEventListener("click",async()=>{
+      const desired=!a.is_active;
+      if(!window.confirm((a.display_name||"선택 계정")+" 계정을 "+(desired?"다시 활성화":"비활성화")+"할까요?\\n출결 기록은 삭제되지 않습니다."))return;
+      toggle.disabled=true;toggle.textContent="처리 중…";
+      const {error:changeError}=await authClient.rpc("set_school_account_active",{p_target_id:a.id,p_is_active:desired});
+      if(changeError){window.alert("계정 상태 변경 실패: "+changeError.message);toggle.disabled=false;toggle.textContent=a.is_active?"비활성화":"다시 활성화";return;}
+      const {data:updated,error:refreshError}=await authClient.from("profiles").select("id,display_name,student_number,role,is_active,is_school_admin").eq("school_id",me.school_id).order("display_name").limit(500);
+      if(refreshError){window.alert("변경 요청은 처리됐지만 목록을 다시 불러오지 못했습니다. 화면을 새로고침해 주세요.");return;}
+      accounts=updated;render();
+     });item.append(toggle);
+    }
+    list.append(item);
    }
   };
   search.addEventListener("input",render);role.addEventListener("change",render);status.addEventListener("change",render);render();
