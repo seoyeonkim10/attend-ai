@@ -297,14 +297,16 @@ async function renderTeacherDashboard(panel){
     const item=document.createElement("div");item.style.cssText="border:1px solid #e6eaf1;border-radius:10px;padding:12px;display:grid;gap:7px";
     const heading=document.createElement("strong");heading.textContent=(names.get(req.student_id)||"학생")+" · "+req.attendance_date+" · "+({tardy:"지각",absence:"결석",correction:"정정"}[req.request_type]||"신청");
     const reason=document.createElement("p");reason.textContent=req.reason;reason.style.cssText="margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere";
-    const actions=document.createElement("div");actions.style.cssText="display:flex;gap:8px";
+    const actions=document.createElement("div");actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
     const feedback=document.createElement("span");feedback.style.cssText="font-size:12px;color:#718096";
-    ["approved","rejected"].forEach(state=>{const btn=document.createElement("button");btn.type="button";btn.textContent=state==="approved"?"승인":"반려";styleButton(btn,false);btn.addEventListener("click",async()=>{
+    const reviewButtons=[];
+    ["approved","rejected"].forEach(state=>{const btn=document.createElement("button");reviewButtons.push(btn);btn.type="button";btn.textContent=state==="approved"?"승인":"반려";styleButton(btn,false);btn.addEventListener("click",async()=>{
      if(!confirm((state==="approved"?"승인":"반려")+"하시겠습니까? 신청 검토 결과만 저장되며 실제 출결 상태는 자동 변경되지 않습니다."))return;
-     btn.disabled=true;const {data:{user:reviewer}}=await authClient.auth.getUser();
+     reviewButtons.forEach(b=>b.disabled=true);feedback.textContent="처리 중...";const {data:{user:reviewer},error:reviewerError}=await authClient.auth.getUser();
+     if(reviewerError||!reviewer){feedback.textContent="로그인 정보를 확인할 수 없습니다.";reviewButtons.forEach(b=>b.disabled=false);return;}
      const {data:updated,error:reviewError}=await authClient.from("attendance_requests").update({review_status:state,reviewed_by:reviewer.id,reviewed_at:new Date().toISOString()}).eq("id",req.id).eq("review_status","pending").select("id");
-     if(reviewError||!updated?.length){feedback.textContent="처리 실패: 교사 권한 또는 데이터베이스 설정을 확인해 주세요.";btn.disabled=false;return;}
-     item.remove();feedback.textContent="처리 완료";requestsHint.textContent="검토 결과가 저장되었습니다. 실제 출결 상태는 별도 확인 후 수정하세요.";
+     if(reviewError||!updated?.length){feedback.textContent="처리 실패: "+(reviewError?.message||"이미 처리되었거나 접근 권한이 없습니다.");reviewButtons.forEach(b=>b.disabled=false);return;}
+     actions.replaceChildren();feedback.textContent=(state==="approved"?"승인 완료":"반려 완료")+" · 출결 기록은 별도 수정이 필요합니다.";requestsHint.textContent="검토 결과가 저장되었습니다. 실제 출결 상태는 별도 확인 후 수정하세요.";
     });actions.append(btn)});
     item.append(heading,reason,actions,feedback);requestsList.append(item);
    });
@@ -441,10 +443,10 @@ async function showAuthenticatedUser(user){
  [reqClass,reqDate,reqType,reqReason].forEach(el=>el.style.cssText="padding:11px;border:1px solid #dfe5ef;border-radius:9px;width:100%;font:inherit");
  reqDate.type="date";reqDate.required=true;reqDate.value=new Date(Date.now()+9*3600000).toISOString().slice(0,10);
  [["tardy","지각"],["absence","결석"],["correction","출결 정정 요청"]].forEach(([value,label])=>{const o=document.createElement("option");o.value=value;o.textContent=label;reqType.append(o)});
- reqReason.placeholder="신청 사유를 입력해 주세요 (3자 이상)";reqReason.rows=3;reqReason.required=true;reqReason.maxLength=2000;
+ reqReason.placeholder="신청 사유를 입력해 주세요 (3자 이상)";reqReason.rows=3;reqReason.required=true;reqReason.minLength=3;reqReason.maxLength=2000;
  reqButton.type="submit";reqButton.textContent="사유 신청 제출";reqButton.style.cssText="padding:12px;border:0;border-radius:9px;background:#4968e8;color:#fff;font-weight:700;cursor:pointer";
- reqMessage.style.cssText="margin:0;color:#718096;font-size:12px";
- const reqHistory=document.createElement("div");reqHistory.style.cssText="display:grid;gap:7px";
+ reqMessage.style.cssText="margin:0;color:#718096;font-size:12px";reqMessage.setAttribute("role","status");reqMessage.setAttribute("aria-live","polite");
+ const reqHistory=document.createElement("div");reqHistory.style.cssText="display:grid;gap:7px";reqHistory.setAttribute("aria-live","polite");
  reqForm.append(reqClass,reqDate,reqType,reqReason,reqButton,reqMessage);requestBox.append(reqTitle,reqHelp,reqForm,reqHistory);panel.append(requestBox);
  const {data:memberships,error:memberError}=await authClient.from("class_members").select("class_id").eq("user_id",user.id).eq("member_role","student");
  if(memberError||!memberships?.length){reqMessage.textContent="등록된 학급이 없어 신청할 수 없습니다. 관리자에게 학급 배정을 요청해 주세요.";reqButton.disabled=true;}
@@ -455,7 +457,7 @@ async function showAuthenticatedUser(user){
   if(!requests?.length){const p=document.createElement("p");p.textContent="아직 제출한 신청이 없습니다.";reqHistory.append(p);}
   (requests||[]).forEach(x=>{const p=document.createElement("div");p.style.cssText="padding:10px;border:1px solid #e6eaf1;border-radius:9px;font-size:12px;overflow-wrap:anywhere";p.textContent=x.attendance_date+" · "+({tardy:"지각",absence:"결석",correction:"정정"}[x.request_type]||"신청")+" · "+({pending:"검토 대기",approved:"승인",rejected:"반려"}[x.review_status]||x.review_status)+" — "+x.reason;reqHistory.append(p)});
  };
- reqForm.addEventListener("submit",async e=>{e.preventDefault();const reason=reqReason.value.trim();if(reason.length<3){reqMessage.textContent="사유를 3자 이상 입력해 주세요.";return;}reqButton.disabled=true;reqMessage.textContent="제출 중...";
+ reqForm.addEventListener("submit",async e=>{e.preventDefault();if(reqButton.disabled)return;const reason=reqReason.value.trim();if(reason.length<3){reqMessage.textContent="사유를 3자 이상 입력해 주세요.";return;}if(!reqClass.value||!reqDate.value){reqMessage.textContent="학급과 날짜를 확인해 주세요.";return;}reqButton.disabled=true;reqMessage.textContent="제출 중...";
   const {error}=await authClient.from("attendance_requests").insert({student_id:user.id,class_id:reqClass.value,attendance_date:reqDate.value,request_type:reqType.value,reason});
   reqButton.disabled=false;if(error){reqMessage.textContent="제출 실패: 학급 권한 또는 데이터베이스 설정을 확인해 주세요. "+error.message;return;}
   reqMessage.textContent="신청이 접수되었습니다. 교사 검토 후 결과가 표시됩니다. 실제 출결 기록은 자동 변경되지 않습니다.";reqReason.value="";await refreshRequests();
