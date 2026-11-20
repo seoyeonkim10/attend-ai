@@ -174,7 +174,7 @@ async function renderTeacherDashboard(panel){
  const {data:students,error:studentError}=await authClient.from("profiles").select("id,display_name,student_number,is_active").eq("school_id",me.school_id).eq("role","student").order("student_number",{ascending:true}).limit(500);
  const {data:adminProfile,error:adminError}=await authClient.from("profiles").select("is_school_admin").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
  const canManage=!adminError&&adminProfile?.is_school_admin===true;
- if(!canManage){classesTab.disabled=true;classesTab.title="관리자 권한 확인 필요";classesTab.textContent="학급 관리 (권한 확인 필요)";const notice=document.createElement("p");notice.style.cssText="margin:4px 0 12px;color:#b7791f;font-size:12px;line-height:1.6";notice.textContent=adminError?"관리자 권한을 조회하지 못했습니다: "+adminError.message:"관리자 표시를 확인하지 못했습니다. 현재 로그인 계정의 is_school_admin 값과 프로필을 확인해 주세요.";tabs.after(notice);}
+ if(!canManage){classesTab.disabled=true;classesTab.title="관리자 권한 확인 필요";classesTab.textContent="학급 관리 (권한 확인 필요)";const notice=document.createElement("p");notice.style.cssText="margin:4px 0 12px;color:#b7791f;font-size:12px;line-height:1.6";notice.textContent=adminError?"관리자 권한을 조회하지 못했습니다: "+adminError.message:"일반 교사 계정입니다. 학급 관리 기능은 학교 관리자에게만 제공됩니다.";tabs.after(notice);}
  const classesView=async()=>{
   if(!canManage)return;
   [attendanceTab,studentsTab,auditTab,classesTab].forEach(b=>styleButton(b,b===classesTab));
