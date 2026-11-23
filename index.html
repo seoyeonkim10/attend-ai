@@ -479,19 +479,37 @@ async function renderTeacherDashboard(panel){
   [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab].forEach(b=>styleButton(b,b===statsTab));
   body.replaceChildren();
   const title=document.createElement("h3");title.textContent="출결 통계";title.style.cssText="margin:14px 0;font-size:18px";
-  const note=document.createElement("p");note.textContent="현재 조회 권한이 있는 출결 기록을 날짜별로 집계합니다. 기록이 없는 학생은 결석으로 간주하지 않습니다.";note.style.cssText="color:#718096;font-size:13px;line-height:1.7";
-  const date=document.createElement("input");date.type="date";date.style.cssText="padding:11px;border:1px solid #dfe5ef;border-radius:9px;margin:12px 0";date.value=new Date().toLocaleDateString("en-CA");
+  const note=document.createElement("p");note.textContent="조회 권한이 있는 출결 기록만 집계합니다. 기록이 없는 학생은 결석으로 간주하지 않습니다.";note.style.cssText="color:#718096;font-size:13px;line-height:1.7";
+  const filters=document.createElement("div");filters.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0";
+  const date=document.createElement("input");date.type="date";date.value=new Date().toLocaleDateString("en-CA");
+  const cls=document.createElement("select"),student=document.createElement("select");
+  for(const el of [date,cls,student])el.style.cssText="padding:11px;border:1px solid #dfe5ef;border-radius:9px;min-width:150px";
+  const option=(value,label)=>{const o=document.createElement("option");o.value=value;o.textContent=label;return o;};
+  cls.append(option("","전체 학급"));student.append(option("","전체 학생"));
+  filters.append(date,cls,student);
   const cards=document.createElement("div");cards.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:14px 0";
-  const detail=document.createElement("p");detail.style.cssText="font-size:13px;color:#718096";body.append(title,note,date,cards,detail);
+  const detail=document.createElement("p");detail.style.cssText="font-size:13px;color:#718096";body.append(title,note,filters,cards,detail);
+  const [classResult,studentResult]=await Promise.all([
+   authClient.from("classes").select("id,name").eq("school_id",me.school_id).order("name").limit(200),
+   authClient.from("profiles").select("id,display_name,student_number").eq("school_id",me.school_id).eq("role","student").order("display_name").limit(500)
+  ]);
+  if(!classResult.error)for(const c of classResult.data||[])cls.append(option(c.id,c.name));
+  if(!studentResult.error)for(const p of studentResult.data||[])student.append(option(p.id,(p.display_name||"이름 없음")+(p.student_number?" ("+p.student_number+")":"")));
+  if(classResult.error||studentResult.error){const warn=document.createElement("p");warn.style.cssText="font-size:12px;color:#b7791f";warn.textContent="일부 필터 목록을 조회할 수 없습니다. 담당 학급·학생 조회 권한을 확인해 주세요.";filters.after(warn);}
+  let requestId=0;
   const render=async()=>{
-   cards.replaceChildren();detail.textContent="불러오는 중…";
-   const {data,error}=await authClient.from("attendance_records").select("id,status,student_id").eq("attendance_date",date.value).limit(1000);
+   const current=++requestId;cards.replaceChildren();detail.textContent="불러오는 중…";
+   let query=authClient.from("attendance_records").select("id,status,student_id,class_id").eq("attendance_date",date.value);
+   if(cls.value)query=query.eq("class_id",cls.value);
+   if(student.value)query=query.eq("student_id",student.value);
+   const {data,error}=await query.limit(1000);
+   if(current!==requestId)return;
    if(error){detail.textContent="통계 조회 실패: "+error.message;return;}
    const rows=data||[];const groups=[["전체 기록",rows.length],["출석",rows.filter(r=>r.status==="present").length],["지각",rows.filter(r=>["excused_tardy","unexcused_tardy","late"].includes(r.status)).length],["결석",rows.filter(r=>["excused_absence","unexcused_absence","absent"].includes(r.status)).length],["확인 필요",rows.filter(r=>r.status==="needs_review").length]];
    for(const [label,value] of groups){const card=document.createElement("div");card.style.cssText="background:#fff;border:1px solid #e6eaf1;border-radius:15px;padding:20px;box-shadow:0 8px 30px rgba(31,45,80,.06)";const heading=document.createElement("div");heading.style.cssText="font-size:12px;color:#718096";heading.textContent=label;const number=document.createElement("strong");number.style.cssText="display:block;font-size:28px;margin-top:10px;color:#172033";number.textContent=value+"건";card.append(heading,number);cards.append(card);}
-   detail.textContent="선택 날짜의 조회 가능한 출결 기록 "+rows.length+"건을 집계했습니다."+(rows.length===1000?" 최대 1,000건까지만 집계되어 결과가 일부일 수 있습니다.":"");
+   detail.textContent="선택 조건의 조회 가능한 출결 기록 "+rows.length+"건을 집계했습니다."+(rows.length===1000?" 최대 1,000건까지만 집계되어 결과가 일부일 수 있습니다.":"");
   };
-  date.addEventListener("change",render);await render();
+  date.addEventListener("change",render);cls.addEventListener("change",render);student.addEventListener("change",render);await render();
  };
  attendanceTab.addEventListener("click",attendanceView);statsTab.addEventListener("click",statsView);accountsTab.addEventListener("click",accountsView);studentsTab.addEventListener("click",studentsView);classesTab.addEventListener("click",classesView);auditTab.addEventListener("click",auditView);
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
