@@ -228,7 +228,7 @@ async function renderTeacherDashboard(panel){
  };
  const classesView=async()=>{header.style.display="flex";
   if(!canManage)return;
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===classesTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===classesTab));
   body.replaceChildren();
   const heading=document.createElement("h3");heading.textContent="학급 관리";heading.style.cssText="margin:12px 0;font-size:18px";
   const info=document.createElement("p");info.textContent="관리자 권한으로 학급을 생성하고 기존 학교 계정을 학급에 배정합니다. 새 로그인 계정 생성은 아직 지원하지 않습니다.";info.style.cssText="color:#718096;font-size:13px;line-height:1.7";
@@ -288,7 +288,7 @@ async function renderTeacherDashboard(panel){
   await load();
  };
  const attendanceView=async()=>{header.style.display="flex";
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===attendanceTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===attendanceTab));
   body.replaceChildren();
   const filters=document.createElement("div");filters.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0";
   const search=document.createElement("input");search.type="search";search.placeholder="학생 이름 또는 학번 검색";search.style.cssText="flex:1;min-width:190px;padding:11px 12px;border:1px solid #dfe5ef;border-radius:9px";
@@ -435,7 +435,7 @@ async function renderTeacherDashboard(panel){
   search.addEventListener("input",render);date.addEventListener("change",render);status.addEventListener("change",render);render();
  };
  const studentsView=()=>{header.style.display="flex";
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===studentsTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===studentsTab));
   body.replaceChildren();
   const intro=document.createElement("div");intro.style.cssText="padding:16px;border:1px solid #e6eaf1;border-radius:12px;background:#fff;margin:12px 0 14px";
   const title=document.createElement("strong");title.textContent="학생 명단";title.style.cssText="display:block;font-size:16px;margin-bottom:5px";
@@ -482,7 +482,7 @@ async function renderTeacherDashboard(panel){
  };
  const accountsView=async()=>{header.style.display="flex";
   if(!canManage)return;
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===accountsTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===accountsTab));
   body.replaceChildren();
   const heading=document.createElement("h3");heading.textContent="학교 계정 관리";heading.style.cssText="font-size:18px;margin:14px 0 8px";
   const desc=document.createElement("p");desc.textContent="같은 학교에서 조회 권한이 허용된 계정만 표시합니다. 관리자는 같은 학교의 일반 계정을 활성화하거나 비활성화할 수 있습니다. 관리자 계정은 변경할 수 없습니다.";desc.style.cssText="font-size:13px;color:#718096;line-height:1.7";
@@ -526,7 +526,7 @@ async function renderTeacherDashboard(panel){
   search.addEventListener("input",render);role.addEventListener("change",render);status.addEventListener("change",render);render();
  };
  const statsView=async()=>{header.style.display="flex";
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===statsTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===statsTab));
   body.replaceChildren();
   const title=document.createElement("h3");title.textContent="출결 통계";title.style.cssText="margin:14px 0;font-size:18px";
   const note=document.createElement("p");note.textContent="조회 권한이 있는 출결 기록만 집계합니다. 기록이 없는 학생은 결석으로 간주하지 않습니다.";note.style.cssText="color:#718096;font-size:13px;line-height:1.7";
@@ -584,7 +584,7 @@ async function renderTeacherDashboard(panel){
  };
  const rulesView=()=>{header.style.display="flex";
   if(!canManage)return;
-  [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===rulesTab));
+  [overviewTab,attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===rulesTab));
   body.replaceChildren();
   const heading=document.createElement("h3");heading.textContent="학교 출결 규정";heading.style.cssText="font-size:18px;margin:14px 0 6px";
   const note=document.createElement("p");note.textContent="학교 규정 초안 · 읽기 전용 · 실제 출결 판정에는 미적용";note.style.cssText="font-size:12px;color:#718096;margin:0 0 18px";
