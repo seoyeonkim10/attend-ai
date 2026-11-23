@@ -166,7 +166,7 @@ async function renderTeacherDashboard(panel){
  const heading=document.createElement("div");const h=document.createElement("h2");h.textContent="교사 관리";h.style.cssText="margin:0 0 5px;font-size:24px;color:#172033";
  const desc=document.createElement("p");desc.textContent="담당 학생과 출결 현황을 확인합니다.";desc.style.cssText="margin:0;color:#718096;font-size:13px";heading.append(h,desc);
  const refresh=document.createElement("button");refresh.textContent="새로고침";styleButton(refresh,false);refresh.addEventListener("click",()=>renderTeacherDashboard(panel));header.append(heading,refresh);
- const tabs=document.createElement("div");tabs.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:16px 0";
+ const tabs=document.createElement("div");tabs.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:16px 0";
  const attendanceTab=document.createElement("button"),studentsTab=document.createElement("button"),classesTab=document.createElement("button"),auditTab=document.createElement("button"),accountsTab=document.createElement("button"),statsTab=document.createElement("button"),rulesTab=document.createElement("button");attendanceTab.textContent="출결 현황";studentsTab.textContent="학생 관리";classesTab.textContent="학급 관리";auditTab.textContent="출결 변경 이력";styleButton(attendanceTab,true);styleButton(studentsTab,false);styleButton(classesTab,false);styleButton(auditTab,false);accountsTab.textContent="학교 계정 관리";styleButton(accountsTab,false);statsTab.textContent="출결 통계";styleButton(statsTab,false);rulesTab.textContent="출결 규정";styleButton(rulesTab,false);tabs.append(attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab);
  const body=document.createElement("div");panel.append(header,tabs,body);
  const {data:me,error:meError}=await authClient.from("profiles").select("school_id").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
@@ -536,16 +536,26 @@ async function renderTeacherDashboard(panel){
   if(!canManage)return;
   [attendanceTab,statsTab,studentsTab,auditTab,classesTab,accountsTab,rulesTab].forEach(b=>styleButton(b,b===rulesTab));
   body.replaceChildren();
-  const heading=document.createElement("h3");heading.textContent="학교 출결 규정 · 초안";heading.style.cssText="font-size:18px;margin:14px 0";
-  const note=document.createElement("p");note.textContent="학교에서 알려준 기준을 정리한 개발용 화면입니다. 아직 데이터베이스에 저장되거나 실제 출결 판정에 적용되지 않습니다. 인정·미인정 여부는 교사가 결정합니다.";note.style.cssText="font-size:13px;color:#718096;line-height:1.8";
-  const table=document.createElement("div");table.style.cssText="display:grid;gap:9px;margin:18px 0";
-  const rows=[["월요일","08:25"],["화요일","08:25"],["수요일","12:55"],["목요일","08:25"],["금요일","08:25"]];
-  for(const [day,time] of rows){const row=document.createElement("div");row.style.cssText="display:flex;justify-content:space-between;align-items:center;border:1px solid #e6eaf1;background:#fff;border-radius:10px;padding:12px 16px";const d=document.createElement("strong");d.textContent=day;const t=document.createElement("span");t.textContent=time+"까지 등교";row.append(d,t);table.append(row);}
-  const details=document.createElement("div");details.style.cssText="border:1px solid #e6eaf1;background:#fff;border-radius:10px;padding:16px;line-height:2;font-size:14px";
-  const lines=["지각: 증빙 서류 없음 · 사유 확인 후 교사 판단","결석: 증빙 서류를 선생님께 직접 제출 · 교사 확인","인정 가능 사유 후보: 병원 진료, 질병, 가족 행사, 대회","인정·미인정의 세부 판정 기준: 학교 확인 필요"];
-  for(const line of lines){const p=document.createElement("div");p.textContent="• "+line;details.append(p);}
-  const warning=document.createElement("p");warning.style.cssText="font-size:12px;color:#b7791f;margin-top:14px";warning.textContent="미확인 규정을 자동으로 적용하지 않으며, 이 화면은 읽기 전용 초안입니다.";
-  body.append(heading,note,table,details,warning);
+  const heading=document.createElement("h3");heading.textContent="학교 출결 규정";heading.style.cssText="font-size:18px;margin:14px 0 6px";
+  const note=document.createElement("p");note.textContent="학교 규정 초안 · 읽기 전용 · 실제 출결 판정에는 미적용";note.style.cssText="font-size:12px;color:#718096;margin:0 0 18px";
+  const section=document.createElement("h4");section.textContent="등교 마감 시간";section.style.cssText="font-size:14px;margin:0 0 10px";
+  const times=document.createElement("div");times.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px";
+  for(const [days,time] of [["월 · 화 · 목 · 금","08:25"],["수요일","12:55"]]){
+   const card=document.createElement("div");card.style.cssText="border:1px solid #e6eaf1;border-radius:12px;padding:16px;background:#fff";
+   const label=document.createElement("div");label.textContent=days;label.style.cssText="color:#718096;font-size:12px;margin-bottom:6px";
+   const value=document.createElement("strong");value.textContent=time;value.style.cssText="font-size:25px;color:#172033";
+   card.append(label,value);times.append(card);
+  }
+  const section2=document.createElement("h4");section2.textContent="지각 · 결석 처리";section2.style.cssText="font-size:14px;margin:22px 0 10px";
+  const policies=document.createElement("div");policies.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px";
+  for(const [name,summary,detail] of [["지각","증빙 서류 없음","사유 확인 후 교사 판단"],["결석","증빙 서류 제출","선생님께 직접 제출 · 교사 확인"]]){
+   const card=document.createElement("div");card.style.cssText="border:1px solid #e6eaf1;border-radius:12px;padding:16px;background:#fff";
+   const h=document.createElement("strong");h.textContent=name;h.style.cssText="font-size:15px;display:block;margin-bottom:8px";
+   const main=document.createElement("div");main.textContent=summary;main.style.cssText="font-size:14px;margin-bottom:5px";
+   const sub=document.createElement("div");sub.textContent=detail;sub.style.cssText="font-size:12px;color:#718096;line-height:1.6";card.append(h,main,sub);policies.append(card);
+  }
+  const footer=document.createElement("p");footer.style.cssText="font-size:12px;color:#718096;line-height:1.8;margin:16px 0";footer.textContent="인정 가능 사유 후보: 병원 진료 · 질병 · 가족 행사 · 대회. 세부 인정 기준은 학교 확인이 필요하며 교사가 최종 결정합니다.";
+  body.append(heading,note,section,times,section2,policies,footer);
  };
  attendanceTab.addEventListener("click",attendanceView);rulesTab.addEventListener("click",rulesView);statsTab.addEventListener("click",statsView);accountsTab.addEventListener("click",accountsView);studentsTab.addEventListener("click",studentsView);classesTab.addEventListener("click",classesView);auditTab.addEventListener("click",auditView);
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
