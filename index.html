@@ -189,7 +189,7 @@ async function renderTeacherDashboard(panel){
  const {data:me,error:meError}=await authClient.from("profiles").select("school_id").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
  if(meError||!me?.school_id){body.textContent="교사 프로필의 학교 정보를 확인할 수 없습니다. profiles의 school_id와 조회 권한을 확인해 주세요.";return;}
  const {data:students,error:studentError}=await authClient.from("profiles").select("id,display_name,student_number,is_active").eq("school_id",me.school_id).eq("role","student").order("student_number",{ascending:true}).limit(500);
- const {data:adminProfile,error:adminError}=await authClient.from("profiles").select("is_school_admin").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
+ const {data:adminProfile,error:adminError}=await authClient.from("profiles").select("is_school_admin,school_id").eq("id",(await authClient.auth.getUser()).data.user.id).maybeSingle();
  const canManage=!adminError&&adminProfile?.is_school_admin===true;
  if(!canManage){accountsTab.disabled=true;accountsTab.hidden=true;rulesTab.disabled=true;rulesTab.hidden=true;}
  if(!canManage){classesTab.disabled=true;classesTab.title="관리자 권한 확인 필요";classesTab.textContent="학급 관리 (권한 확인 필요)";const notice=document.createElement("p");notice.style.cssText="margin:4px 0 12px;color:#b7791f;font-size:12px;line-height:1.6";notice.textContent=adminError?"관리자 권한을 조회하지 못했습니다: "+adminError.message:"일반 교사 계정입니다. 학급 관리 기능은 학교 관리자에게만 제공됩니다.";tabs.after(notice);}
@@ -583,14 +583,14 @@ async function renderTeacherDashboard(panel){
   };
   date.addEventListener("change",render);cls.addEventListener("change",render);student.addEventListener("change",render);await render();
  };
- const evaluateArrival=(date,time,schoolDay)=>{
+ const evaluateArrival=(date,time,schoolDay,rules)=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return {label:"날짜와 시간을 입력해 주세요."};
   const d=new Date(date+"T00:00:00Z");if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date)return {label:"유효한 날짜를 입력해 주세요."};
   const day=d.getUTCDay();if(!schoolDay||day===0||day===6)return {label:"등교일 아님 · 판정 제외"};
-  const cutoff=day===3?"12:55":"08:25";
+  const cutoff=rules[day-1];
   return {label:time<=cutoff?"정상 등교 · 출석":"지각 · 교사 인정 여부 확인 필요",cutoff};
  };
- const rulesView=()=>{header.style.display="flex";
+ const rulesView=async()=>{header.style.display="flex";
   if(!canManage)return;
   selectTeacherTab(rulesTab);
   body.replaceChildren();
@@ -598,12 +598,31 @@ async function renderTeacherDashboard(panel){
   const note=document.createElement("p");note.textContent="학교 규정 초안 · 아래에서 자동 판정을 테스트할 수 있습니다. 실제 기록에는 아직 미적용";note.style.cssText="font-size:12px;color:#718096;margin:0 0 18px";
   const section=document.createElement("h4");section.textContent="등교 마감 시간";section.style.cssText="font-size:14px;margin:0 0 10px";
   const times=document.createElement("div");times.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px";
-  for(const [days,time] of [["월 · 화 · 목 · 금","08:25"],["수요일","12:55"]]){
-   const card=document.createElement("div");card.style.cssText="border:1px solid #e6eaf1;border-radius:12px;padding:16px;background:#fff";
-   const label=document.createElement("div");label.textContent=days;label.style.cssText="color:#718096;font-size:12px;margin-bottom:6px";
-   const value=document.createElement("strong");value.textContent=time;value.style.cssText="font-size:25px;color:#172033";
-   card.append(label,value);times.append(card);
+  const keys=["monday_time","tuesday_time","wednesday_time","thursday_time","friday_time"];
+  const schoolId=adminProfile?.school_id;
+  note.textContent="저장된 학교 규정을 불러오는 중…";
+  body.append(heading,note);
+  const {data:stored,error:loadError}=await authClient.from("school_attendance_rules").select(keys.join(",")).eq("school_id",schoolId).maybeSingle();
+  if(rulesTab.getAttribute("aria-current")!=="page")return;
+  if(loadError||!stored){note.textContent="학교 규정을 불러오지 못했습니다. 관리자 권한 및 학교 설정을 확인하세요.";return;}
+  let saved=keys.map(k=>stored[k].slice(0,5));
+  note.textContent="학교별 저장 규정 · 실제 출결 기록에는 아직 미적용";
+  const inputs=[];
+  for(const [i,days] of ["월요일","화요일","수요일","목요일","금요일"].entries()){
+   const card=document.createElement("label");card.style.cssText="display:grid;gap:8px;border:1px solid #e6eaf1;border-radius:12px;padding:16px;background:#fff";
+   const input=document.createElement("input");input.type="time";input.required=true;input.value=saved[i];input.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:8px";inputs.push(input);card.append(document.createTextNode(days),input);times.append(card);
   }
+  const save=document.createElement("button");save.type="button";save.textContent="규정 저장";save.style.cssText="background:#4968e8;color:white;padding:12px 20px;border-radius:9px;margin-top:14px";
+  const feedback=document.createElement("p");feedback.setAttribute("role","status");feedback.style.cssText="font-size:13px;color:#475467";
+  save.addEventListener("click",async()=>{
+   const values=inputs.map(i=>i.value);if(values.some(v=>!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(v))){feedback.textContent="모든 요일의 시간을 입력하세요.";return;}
+   save.disabled=true;feedback.textContent="저장 중…";
+   try{const payload=Object.fromEntries(keys.map((k,i)=>[k,values[i]+":00"]));payload.updated_at=new Date().toISOString();
+   const {data,error}=await authClient.from("school_attendance_rules").update(payload).eq("school_id",schoolId).select(keys.join(",")).single();
+   if(error||!data){feedback.textContent="저장 실패 · 관리자 권한 또는 연결을 확인하세요.";return;}
+   saved=keys.map(k=>data[k].slice(0,5));feedback.textContent="학교 규정이 저장되었습니다.";update();
+   }catch(e){feedback.textContent="저장 실패 · 연결을 확인하세요.";}finally{save.disabled=false;}
+  });
   const section2=document.createElement("h4");section2.textContent="지각 · 결석 처리";section2.style.cssText="font-size:14px;margin:22px 0 10px";
   const policies=document.createElement("div");policies.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px";
   for(const [name,summary,detail] of [["지각","증빙 서류 없음","사유 확인 후 교사 판단"],["결석","증빙 서류 제출","선생님께 직접 제출 · 교사 확인"]]){
@@ -622,9 +641,9 @@ async function renderTeacherDashboard(panel){
   for(const [label,input] of [["등교 날짜",date],["등교 시각 (KST)",time]]){const wrap=document.createElement("label");wrap.style.cssText="display:grid;gap:7px;font-size:13px";input.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:9px;background:#fff";wrap.append(document.createTextNode(label),input);fields.append(wrap);}
   const dayLabel=document.createElement("label");dayLabel.style.cssText="display:flex;align-items:center;gap:8px;padding:10px;font-size:13px";const day=document.createElement("input");day.type="checkbox";day.checked=true;dayLabel.append(day,document.createTextNode("학교 등교일"));fields.append(dayLabel);
   const result=document.createElement("div");result.setAttribute("role","status");result.style.cssText="padding:16px;background:#f5f7fb;border-radius:10px;margin-top:16px;font-weight:600;font-size:14px";
-  const update=()=>{const v=evaluateArrival(date.value,time.value,day.checked);result.textContent=v.label+(v.cutoff?" · 등교 마감 "+v.cutoff:"");};
+  const update=()=>{const v=evaluateArrival(date.value,time.value,day.checked,saved);result.textContent=v.label+(v.cutoff?" · 등교 마감 "+v.cutoff:"");};
   for(const input of [date,time,day])input.addEventListener("change",update);update();test.append(title,hint,fields,result);
-  body.append(heading,note,section,times,section2,policies,footer,test);
+  body.append(heading,note,section,times,save,feedback,section2,policies,footer,test);
  };
  overviewTab.addEventListener("click",overviewView);attendanceTab.addEventListener("click",attendanceView);rulesTab.addEventListener("click",rulesView);statsTab.addEventListener("click",statsView);accountsTab.addEventListener("click",accountsView);studentsTab.addEventListener("click",studentsView);classesTab.addEventListener("click",classesView);auditTab.addEventListener("click",auditView);
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
