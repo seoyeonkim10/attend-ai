@@ -583,11 +583,11 @@ async function renderTeacherDashboard(panel){
   };
   date.addEventListener("change",render);cls.addEventListener("change",render);student.addEventListener("change",render);await render();
  };
- const evaluateArrival=(date,time,schoolDay,rules)=>{
+ const evaluateArrival=(date,time,schoolDay,rules,event)=>{
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return {label:"날짜와 시간을 입력해 주세요."};
   const d=new Date(date+"T00:00:00Z");if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,10)!==date)return {label:"유효한 날짜를 입력해 주세요."};
-  const day=d.getUTCDay();if(!schoolDay||day===0||day===6)return {label:"등교일 아님 · 판정 제외"};
-  const cutoff=rules[day-1];
+  const day=d.getUTCDay();if(!schoolDay||(event&&event.day_type!=="special_school_day")||(!event&&(day===0||day===6)))return {label:"등교일 아님 · 판정 제외"};
+  const cutoff=event?.day_type==="special_school_day"?event.arrival_time.slice(0,5):rules[day-1];
   return {label:time<=cutoff?"정상 등교 · 출석":"지각 · 교사 인정 여부 확인 필요",cutoff};
  };
  const rulesView=async()=>{header.style.display="flex";
@@ -634,16 +634,42 @@ async function renderTeacherDashboard(panel){
   const footer=document.createElement("p");footer.style.cssText="font-size:12px;color:#718096;line-height:1.8;margin:16px 0";footer.textContent="인정 가능 사유 후보: 병원 진료 · 질병 · 가족 행사 · 대회. 세부 인정 기준은 학교 확인이 필요하며 교사가 최종 결정합니다.";
   const test=document.createElement("section");test.style.cssText="background:#fff;border:1px solid #e6eaf1;border-radius:16px;padding:22px;margin-top:22px";
   const title=document.createElement("h3");title.textContent="등교 시간 자동 판정 테스트";title.style.cssText="margin:0 0 8px;font-size:17px";
-  const hint=document.createElement("p");hint.textContent="한국 시간 기준 · 테스트 결과는 데이터베이스에 저장되지 않습니다. 공휴일 및 방학은 직접 등교일 체크를 해제하세요.";hint.style.cssText="color:#718096;font-size:13px;line-height:1.7";
+  const hint=document.createElement("p");hint.textContent="한국 시간 기준 · 테스트 결과는 데이터베이스에 저장되지 않습니다. 등록된 학사일정이 자동 반영됩니다. 등교일 체크 해제로 수동 제외할 수도 있습니다.";hint.style.cssText="color:#718096;font-size:13px;line-height:1.7";
   const fields=document.createElement("div");fields.style.cssText="display:flex;gap:12px;flex-wrap:wrap;align-items:end";
   const date=document.createElement("input");date.type="date";date.value=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
   const time=document.createElement("input");time.type="time";time.value="08:25";
   for(const [label,input] of [["등교 날짜",date],["등교 시각 (KST)",time]]){const wrap=document.createElement("label");wrap.style.cssText="display:grid;gap:7px;font-size:13px";input.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:9px;background:#fff";wrap.append(document.createTextNode(label),input);fields.append(wrap);}
   const dayLabel=document.createElement("label");dayLabel.style.cssText="display:flex;align-items:center;gap:8px;padding:10px;font-size:13px";const day=document.createElement("input");day.type="checkbox";day.checked=true;dayLabel.append(day,document.createTextNode("학교 등교일"));fields.append(dayLabel);
   const result=document.createElement("div");result.setAttribute("role","status");result.style.cssText="padding:16px;background:#f5f7fb;border-radius:10px;margin-top:16px;font-weight:600;font-size:14px";
-  const update=()=>{const v=evaluateArrival(date.value,time.value,day.checked,saved);result.textContent=v.label+(v.cutoff?" · 등교 마감 "+v.cutoff:"");};
+  let testSequence=0;const update=async()=>{const seq=++testSequence;result.textContent="학사일정 확인 중…";const {data:event,error}=await authClient.from("school_calendar").select("day_type,arrival_time,title").eq("school_id",schoolId).eq("calendar_date",date.value||"1900-01-01").maybeSingle();if(seq!==testSequence)return;if(error){result.textContent="학사일정 조회 실패 · 판정 보류";return;}const v=evaluateArrival(date.value,time.value,day.checked,saved,event);result.textContent=v.label+(v.cutoff?" · 등교 마감 "+v.cutoff:"")+(event?" · "+event.title:"");};
   for(const input of [date,time,day])input.addEventListener("change",update);update();test.append(title,hint,fields,result);
-  body.append(heading,note,section,times,save,feedback,section2,policies,footer,test);
+  const calendar=document.createElement("section");calendar.style.cssText="background:#fff;border:1px solid #e6eaf1;border-radius:16px;padding:22px;margin-top:22px";
+  const calTitle=document.createElement("h3");calTitle.textContent="학사일정 관리";
+  const calHint=document.createElement("p");calHint.textContent="기간 전체를 등록할 수 있습니다. 기존 일정과 겹치면 등록하지 않습니다. 수정은 목록에서 날짜별로 진행하세요.";calHint.style.cssText="font-size:13px;color:#718096";
+  const form=document.createElement("form");form.style.cssText="display:flex;gap:12px;flex-wrap:wrap;align-items:end";
+  const start=document.createElement("input"),end=document.createElement("input"),name=document.createElement("input"),kind=document.createElement("select"),arrival=document.createElement("input");
+  start.type=end.type="date";start.value=end.value=date.value;name.type="text";name.maxLength=100;arrival.type="time";arrival.value="10:00";
+  const kinds={holiday:"공휴일",vacation:"방학",school_closed:"학교 휴무일",special_school_day:"특별 등교일"};
+  for(const [v,t] of Object.entries(kinds)){const o=document.createElement("option");o.value=v;o.textContent=t;kind.append(o);}
+  for(const [label,input] of [["시작일",start],["종료일",end],["일정 이름",name],["유형",kind],["특별 등교 시간",arrival]]){const wrap=document.createElement("label");wrap.style.cssText="display:grid;gap:6px;font-size:13px";input.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:8px";wrap.append(document.createTextNode(label),input);form.append(wrap);}
+  const syncKind=()=>{arrival.disabled=kind.value!=="special_school_day";};kind.addEventListener("change",syncKind);syncKind();
+  const add=document.createElement("button");add.type="submit";add.textContent="일정 등록";add.style.cssText="background:#4968e8;color:white;padding:12px 18px;border-radius:9px";form.append(add);
+  const msg=document.createElement("p");msg.setAttribute("role","status");const list=document.createElement("div");list.style.cssText="display:grid;gap:8px;margin-top:14px";
+  let editing=null;
+  const reset=document.createElement("button");reset.type="button";reset.textContent="수정 취소";reset.hidden=true;form.append(reset);
+  const clearEdit=()=>{editing=null;start.disabled=end.disabled=false;add.textContent="일정 등록";reset.hidden=true;name.value="";};reset.addEventListener("click",clearEdit);
+  const load=async()=>{list.textContent="일정 조회 중…";const {data,error}=await authClient.from("school_calendar").select("calendar_date,title,day_type,arrival_time").eq("school_id",schoolId).order("calendar_date").limit(366);list.replaceChildren();if(error){list.textContent="일정 조회 실패";return;}if(!data.length){list.textContent="등록된 일정 없음";return;}
+   for(const item of data){const row=document.createElement("div");row.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;border:1px solid #e6eaf1;border-radius:9px";const label=document.createElement("span");label.style.flex="1";label.textContent=item.calendar_date+" · "+item.title+" · "+kinds[item.day_type]+(item.arrival_time?" · "+item.arrival_time.slice(0,5):"");
+    const edit=document.createElement("button");edit.type="button";edit.textContent="수정";edit.onclick=()=>{editing=item.calendar_date;start.value=end.value=editing;start.disabled=end.disabled=true;name.value=item.title;kind.value=item.day_type;arrival.value=item.arrival_time?.slice(0,5)||"10:00";syncKind();add.textContent="수정 저장";reset.hidden=false;};
+    const del=document.createElement("button");del.type="button";del.textContent="삭제";del.onclick=async()=>{if(!confirm(item.calendar_date+" 일정을 삭제할까요?"))return;del.disabled=true;const {data,error}=await authClient.from("school_calendar").delete().eq("school_id",schoolId).eq("calendar_date",item.calendar_date).select("calendar_date").single();msg.textContent=error||!data?"삭제 실패":"삭제 완료";if(!error&&data){if(editing===item.calendar_date)clearEdit();await load();update();}else del.disabled=false;};row.append(label,edit,del);list.append(row);}
+   if(data.length===366){const note=document.createElement("p");note.textContent="최대 366개 일정 표시 · 추가 일정은 현재 목록에 표시되지 않을 수 있습니다.";list.append(note);}
+  };
+  form.addEventListener("submit",async e=>{e.preventDefault();const first=new Date(start.value+"T00:00:00Z"),last=new Date(end.value+"T00:00:00Z");const count=(last-first)/86400000+1;if(!name.value.trim()||!Number.isInteger(count)||count<1||count>366||(kind.value==="special_school_day"&&!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(arrival.value))){msg.textContent="일정 이름, 날짜(최대 366일), 특별 등교 시간을 확인하세요.";return;}
+   const values={title:name.value.trim(),day_type:kind.value,arrival_time:kind.value==="special_school_day"?arrival.value+":00":null};add.disabled=true;try{let response;if(editing){response=await authClient.from("school_calendar").update(values).eq("school_id",schoolId).eq("calendar_date",editing).select("calendar_date").single();}else{const rows=Array.from({length:count},(_,i)=>({...values,school_id:schoolId,calendar_date:new Date(first.getTime()+i*86400000).toISOString().slice(0,10)}));response=await authClient.from("school_calendar").insert(rows);}
+   if(response.error){msg.textContent=response.error.code==="23505"?"기존 일정과 날짜가 겹칩니다. 기존 일정을 수정하세요.":"저장 실패 · 권한 또는 연결을 확인하세요.";return;}msg.textContent="일정 저장 완료";clearEdit();await load();update();}catch(err){msg.textContent="저장 실패 · 연결을 확인하세요.";}finally{add.disabled=false;}
+  });
+  calendar.append(calTitle,calHint,form,msg,list);
+  body.append(heading,note,section,times,save,feedback,section2,policies,footer,calendar,test);load();
  };
  overviewTab.addEventListener("click",overviewView);attendanceTab.addEventListener("click",attendanceView);rulesTab.addEventListener("click",rulesView);statsTab.addEventListener("click",statsView);accountsTab.addEventListener("click",accountsView);studentsTab.addEventListener("click",studentsView);classesTab.addEventListener("click",classesView);auditTab.addEventListener("click",auditView);
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
