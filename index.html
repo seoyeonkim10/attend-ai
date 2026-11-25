@@ -752,15 +752,18 @@ async function studentBarcodeGate(panel,user){
   if(busy||closed)return;busy=true;start.disabled=true;
   try{
    scanner=new Html5Qrcode(reader.id,{formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128],useBarCodeDetectorIfSupported:false});
-   let accepted=false;
+   let accepted=false, attempts=0;
+   msg.textContent="카메라 시작 중…";
    await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false},async(value)=>{
     if(accepted||closed)return;accepted=true;
+    msg.textContent="바코드 인식 성공 · 등록 신청 중…";
     await stop();if(!panel.isConnected)return;
     try{
      const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value))),x=>x.toString(16).padStart(2,"0")).join("");
      const result=await call({action:"register",barcode_hash:hash});msg.textContent=result.message||"등록 신청 완료";start.hidden=true;
     }catch(e){msg.textContent=e.message+" 등록 상태를 다시 확인해 주세요.";}
-   },()=>{});
+   },()=>{if(!accepted&&!closed){attempts++;if(attempts===1||attempts%15===0)msg.textContent="바코드 탐색 중 ("+attempts+"회) · 바코드 전체와 흰색 여백을 화면에 맞춰 주세요.";}});
+   if(!accepted&&!closed&&attempts===0)msg.textContent="카메라 실행 완료 · 바코드를 비춰 주세요.";
    if(closed){try{await scanner.stop();}catch{}}
   }catch(e){msg.textContent="카메라를 시작하지 못했습니다. 카메라 권한을 확인하고 다시 시도하세요.";busy=false;start.disabled=false;}
  };
