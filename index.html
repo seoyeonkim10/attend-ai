@@ -723,6 +723,49 @@ async function renderTeacherDashboard(panel){
  if(studentError){studentsTab.disabled=true;studentsTab.title="학생 명단 조회 권한을 확인해야 합니다.";}
  await overviewView();
 }
+async function studentBarcodeGate(panel,user){
+ panel.classList.remove("student-dashboard");panel.style.cssText="width:100%;margin:22px 0;text-align:center";panel.replaceChildren();
+ const heading=document.createElement("h2");heading.textContent="학생증 등록";
+ const msg=document.createElement("p");msg.setAttribute("role","status");msg.textContent="등록 상태 확인 중…";
+ const reader=document.createElement("div");reader.id="studentOnboardingReader";reader.style.cssText="max-width:420px;margin:12px auto";
+ const start=document.createElement("button");start.type="button";start.textContent="학생증 스캔 시작";start.style.cssText="background:#4968e8;color:white;padding:12px;border-radius:10px;width:100%";start.hidden=true;
+ const retry=document.createElement("button");retry.type="button";retry.textContent="등록 상태 다시 확인";retry.style.cssText="margin:12px;padding:10px;border-radius:8px";retry.onclick=()=>location.reload();
+ panel.append(heading,msg,reader,start,retry);
+ async function call(body){
+  const {data}=await authClient.auth.getSession();
+  if(!data.session||data.session.user.id!==user.id)throw Error("다시 로그인해 주세요.");
+  const response=await fetch(SUPABASE_URL+"/functions/v1/register-student-barcode",{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+data.session.access_token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const result=await response.json();if(!response.ok)throw Error(result.message||("등록 서버 오류 ("+response.status+")"));return result;
+ }
+ try{
+  const result=await call({action:"status"});
+  if(result.status==="registered")return true;
+  if(result.status==="pending"){msg.textContent="학생증 등록 신청이 완료되었습니다. 담당자의 확인을 기다려 주세요.";return false;}
+  if(result.status!=="unregistered"){msg.textContent="등록 상태를 담당자에게 확인해 주세요.";return false;}
+  msg.textContent="본인의 테스트 학생증을 스캔해 등록을 신청하세요. 담당자 확인 후 사용할 수 있습니다.";start.hidden=false;
+ }catch(e){msg.textContent="등록 상태 확인 실패: "+e.message;return false;}
+ let scanner=null,busy=false,closed=false;
+ const stop=async()=>{closed=true;if(scanner){try{await scanner.stop();}catch{}try{scanner.clear();}catch{}}};
+ document.getElementById("authSignout").addEventListener("click",stop,{once:true});
+ window.addEventListener("pagehide",stop,{once:true});
+ start.onclick=async()=>{
+  if(busy||closed)return;busy=true;start.disabled=true;
+  try{
+   scanner=new Html5Qrcode(reader.id,{formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128]});
+   let accepted=false;
+   await scanner.start({facingMode:"environment"},{fps:10},async(value)=>{
+    if(accepted||closed)return;accepted=true;
+    await stop();if(!panel.isConnected)return;
+    try{
+     const hash=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value))),x=>x.toString(16).padStart(2,"0")).join("");
+     const result=await call({action:"register",barcode_hash:hash});msg.textContent=result.message||"등록 신청 완료";start.hidden=true;
+    }catch(e){msg.textContent=e.message+" 등록 상태를 다시 확인해 주세요.";}
+   },()=>{});
+   if(closed){try{await scanner.stop();}catch{}}
+  }catch(e){msg.textContent="카메라를 시작하지 못했습니다. 카메라 권한을 확인하고 다시 시도하세요.";busy=false;start.disabled=false;}
+ };
+ return false;
+}
 async function showAuthenticatedUser(user){
  authError("");
  const {data:profile,error}=await authClient.from("profiles").select("role,display_name,is_active").eq("id",user.id).maybeSingle();
@@ -744,6 +787,7 @@ async function showAuthenticatedUser(user){
   await renderTeacherDashboard(panel);
   return;
  }
+ if(!(await studentBarcodeGate(panel,user)))return;
  panel.classList.remove("student-dashboard");panel.style.cssText="width:100%;margin:0;text-align:left";panel.replaceChildren();
  if(!document.getElementById("attendo-teacher-layout-style")){const css=document.createElement("style");css.id="attendo-teacher-layout-style";css.textContent=".auth-result:has(.attendo-teacher-layout){padding:0;display:block;background:#f5f7fb}.auth-result-card:has(.attendo-teacher-layout){max-width:none;width:100%;min-height:100vh;padding:0;border:0;border-radius:0;box-shadow:none;background:#f5f7fb}.auth-result-card:has(.attendo-teacher-layout)>.auth-brand,.auth-result-card:has(.attendo-teacher-layout)>#authWelcome,.auth-result-card:has(.attendo-teacher-layout)>#authProfileInfo,.auth-result-card:has(.attendo-teacher-layout)>#buildMarker{display:none}.auth-result-card:has(.attendo-teacher-layout)>#studentAttendance{margin:0!important}.auth-result-card:has(.attendo-teacher-layout)>#authSignout{position:fixed;bottom:18px;left:18px;z-index:3;width:210px;text-align:center}.attendo-teacher-layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh;gap:0;align-items:stretch}.attendo-teacher-nav{display:flex;flex-direction:column;gap:6px;padding:26px 14px 86px;background:#fff;border-right:1px solid #e6eaf1;position:sticky;top:0;height:100vh;overflow-y:auto}.attendo-live-brand{display:flex;align-items:center;gap:10px;margin:0 0 28px;padding:0 8px 22px;border-bottom:1px solid #eef0f6}.attendo-live-logo{display:grid;place-items:center;width:43px;height:43px;flex-shrink:0;border-radius:12px;background:#4968e8;color:#fff;font-size:22px;font-weight:800}.attendo-live-brand strong{display:block;font-size:16px;color:#172033}.attendo-live-brand small{display:block;font-size:9px;letter-spacing:1.2px;color:#98a2b3;margin-top:3px}.attendo-teacher-content{min-width:0;padding:24px 34px 50px}.attendo-teacher-nav button:focus-visible{outline:2px solid #4968e8;outline-offset:2px}.attendo-teacher-nav button[hidden]{display:none!important}@media(max-width:720px){.attendo-teacher-layout{grid-template-columns:1fr}.attendo-teacher-nav{position:static;height:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:14px;gap:5px}.attendo-live-brand{grid-column:1/-1;margin-bottom:6px;padding-bottom:12px}.attendo-teacher-nav button{font-size:13px!important}.attendo-teacher-content{padding:18px 14px 84px}.auth-result-card:has(.attendo-teacher-layout)>#authSignout{left:auto;right:14px;bottom:12px;width:auto}}.attendo-live-workspace{min-width:0}.attendo-live-topbar{height:82px;background:#fff;border-bottom:1px solid #e6eaf1;display:flex;align-items:center;justify-content:space-between;padding:0 38px;color:#718096;font-size:12px;font-weight:600}.attendo-live-topbar span:last-child{border:1px solid #e6eaf1;background:#f8faff;border-radius:9px;padding:11px 14px}.attendo-nav-label{font-size:10px;font-weight:800;letter-spacing:1.8px;color:#98a2b3;padding:13px 13px 5px;margin-top:6px}.attendo-nav-icon{display:inline-block;width:26px;font-size:17px;color:#8290ad;font-weight:500}.attendo-teacher-nav button{border-left:0!important;border-radius:11px!important;padding:13px 12px!important}.attendo-teacher-nav button:hover{background:#f2f5ff!important}.attendo-live-heading{margin:10px 0 24px!important;padding:0 0 2px}.attendo-live-eyebrow{font-size:10px;letter-spacing:2px;color:#4968e8;font-weight:800;margin-bottom:9px}.attendo-live-heading h2{font-size:27px!important;letter-spacing:-.6px}.attendo-teacher-content{padding:34px 38px 60px}.attendo-teacher-content>div:not(.attendo-live-heading){max-width:1400px}.attendo-teacher-content button:not(.attendo-teacher-nav button){transition:background .15s}.attendo-teacher-content [style*=border-radius]{box-shadow:0 4px 20px rgba(30,49,100,.025)}@media(max-width:720px){.attendo-live-topbar{height:56px;padding:0 15px}.attendo-live-topbar span:last-child{padding:7px;font-size:10px}.attendo-teacher-content{padding:22px 15px 80px}.attendo-nav-label{grid-column:1/-1}}";document.head.append(css);}
  const layout=document.createElement("div");layout.className="attendo-teacher-layout";
