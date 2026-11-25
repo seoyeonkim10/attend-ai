@@ -734,7 +734,7 @@ async function studentBarcodeGate(panel,user){
  async function call(body){
   const {data}=await authClient.auth.getSession();
   if(!data.session||data.session.user.id!==user.id)throw Error("다시 로그인해 주세요.");
-  const response=await fetch(SUPABASE_URL+"/functions/v1/register-student-barcode",{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+data.session.access_token,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const response=await fetch(SUPABASE_URL+"/functions/v1/register-student-barcod",{method:"POST",headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+data.session.access_token,"Content-Type":"application/json"},body:JSON.stringify(body)});
   const result=await response.json();if(!response.ok)throw Error(result.message||("등록 서버 오류 ("+response.status+")"));return result;
  }
  try{
