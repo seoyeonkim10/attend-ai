@@ -242,7 +242,36 @@ async function renderTeacherDashboard(panel){
   const recentTitle=document.createElement("h3");recentTitle.textContent="최근 출결 기록";recentTitle.style.cssText="font-size:16px;margin:0;padding:20px;border-bottom:1px solid #eef1f5";
   const recentBody=document.createElement("div");recentBody.style.cssText="padding:8px 20px";recent.append(recentTitle,recentBody);recent.style.marginTop="18px";
   const makeCard=(label,value,foot)=>{const c=document.createElement("div");c.style.cssText="background:#fff;border:1px solid #e6eaf1;border-radius:16px;padding:22px;min-width:0;box-shadow:0 8px 24px rgba(31,45,80,.03)";const l=document.createElement("div");l.textContent=label;l.style.cssText="font-size:12px;color:#718096";const v=document.createElement("strong");v.textContent=String(value);v.style.cssText="display:block;font-size:32px;color:#172033;margin:15px 0 7px";const f=document.createElement("div");f.textContent=foot;f.style.cssText="font-size:11px;color:#8993a7";c.append(l,v,f);return c;};
-  body.append(intro,cards,sections,recent);
+  const missing=document.createElement("section");missing.style.cssText="background:#fff;border:1px solid #e6eaf1;border-radius:16px;padding:20px;margin:18px 0";
+  const missingTitle=document.createElement("h3");missingTitle.textContent="미출석 확인 대상";
+  const missingNote=document.createElement("p");missingNote.textContent="등교 마감 이후 출결 기록이 없는 활성 학생입니다. 결석 확정이 아니며 담당 교사가 확인해야 합니다.";
+  const missingClass=document.createElement("select");missingClass.style.cssText="padding:10px;border:1px solid #dfe5ef;border-radius:9px";
+  const missingRefresh=document.createElement("button");missingRefresh.type="button";missingRefresh.textContent="다시 조회";missingRefresh.style.cssText="margin:8px;padding:10px;border-radius:9px;background:#eef1ff;color:#4968e8";
+  const missingList=document.createElement("div");missingList.setAttribute("role","status");missingList.textContent="학급 조회 중…";
+  missing.append(missingTitle,missingNote,missingClass,missingRefresh,missingList);
+  body.append(intro,cards,sections,missing,recent);
+  let missingGeneration=0;
+  const loadMissing=async()=>{
+   const generation=++missingGeneration;const cls=missingClass.value;
+   if(!cls){missingList.textContent="조회 가능한 학급이 없습니다.";return;}
+   missingList.textContent="미출석 학생 조회 중…";
+   const {data,error}=await authClient.rpc("get_missing_attendance",{p_class_id:cls});
+   if(generation!==missingGeneration||!missing.isConnected)return;
+   if(error){missingList.textContent="미출석 조회 실패: "+error.message;return;}
+   missingList.replaceChildren();
+   const count=document.createElement("p");count.textContent=data.length?data.length+"명 확인 필요":"현재 조회된 미출석 대상 없음 · 등교 마감 전 또는 휴일일 수도 있습니다.";missingList.append(count);
+   for(const student of data){const row=document.createElement("div");row.style.cssText="padding:10px 0;border-top:1px solid #eef1f5";row.textContent=(student.display_name||"학생")+" · "+(student.student_number||"학번 없음")+" · "+student.attendance_date;missingList.append(row);}
+  };
+  missingRefresh.disabled=true;missingClass.disabled=true;
+  missingRefresh.onclick=loadMissing;missingClass.onchange=loadMissing;
+  void (async()=>{
+   let query=authClient.from("classes").select("id,name").eq("school_id",me.school_id).order("name");
+   if(!canManage){const {data:userData}=await authClient.auth.getUser();if(!userData.user){missingList.textContent="로그인 확인 필요";return;}const {data:members,error}=await authClient.from("class_members").select("class_id").eq("user_id",userData.user.id).eq("member_role","teacher");if(error){missingList.textContent="담당 학급 조회 실패";return;}if(!members.length){missingList.textContent="담당 학급 없음";return;}query=query.in("id",members.map(x=>x.class_id));}
+   const {data,error}=await query;if(!missing.isConnected)return;
+   if(error){missingList.textContent="학급 조회 실패";return;}
+   for(const cls of data){const option=document.createElement("option");option.value=cls.id;option.textContent=cls.name;missingClass.append(option);}
+   missingRefresh.disabled=false;missingClass.disabled=false;await loadMissing();
+  })().catch(()=>{missingList.textContent="미출석 조회 연결 오류";});
   const today=new Date(Date.now()+9*3600000).toISOString().slice(0,10);
   const [studentResult,recordResult]=await Promise.all([authClient.from("profiles").select("id").eq("school_id",me.school_id).eq("role","student").eq("is_active",true).limit(1001),authClient.from("attendance_records").select("student_id,class_id,attendance_date,status,review_status,checked_in_at").eq("attendance_date",today).limit(1001)]);
   if(studentResult.error||recordResult.error){cards.append(makeCard("전체 학생","—","조회 실패"),makeCard("출석","—","조회 실패"),makeCard("지각","—","조회 실패"),makeCard("확인 필요","—","조회 실패"));const msg=document.createElement("p");msg.textContent="출결 데이터를 불러오지 못했습니다. 계정과 조회 권한을 확인해 주세요.";msg.style.cssText="padding:20px;color:#b7791f";trend.append(msg);return;}
