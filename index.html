@@ -48,7 +48,26 @@
 .student-empty,.student-loading{padding:24px!important;color:#718096!important}
 @media(max-width:620px){.student-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.student-intro{padding:22px}.student-intro h3{font-size:21px}.student-stat{padding:16px}.student-history-heading,.student-record{padding:15px}}
 </style>
-</head>
+<style>
+.attendo-mobile-toggle,.attendo-mobile-logout{display:none!important}
+@media(max-width:720px){
+.attendo-teacher-layout{display:flex!important;flex-direction:column!important;min-width:0}
+.attendo-teacher-layout>.attendo-teacher-nav{display:none!important;position:static!important;height:auto!important;width:100%;padding:12px 16px!important;grid-template-columns:1fr!important;order:1;overflow:visible!important}
+.attendo-teacher-layout.mobile-nav-open>.attendo-teacher-nav{display:flex!important}
+.attendo-live-workspace{display:contents!important}
+.attendo-live-topbar{order:0;position:sticky;top:0;z-index:6;height:60px!important;padding:0 14px!important;gap:8px;background:white}
+.attendo-live-topbar>span:first-of-type{font-size:11px}
+.attendo-mobile-toggle,.attendo-mobile-logout{display:inline-flex!important;align-items:center;justify-content:center;min-height:44px;padding:10px 12px;background:#eef1ff;color:#4968e8;border-radius:10px;font-weight:700;white-space:nowrap}
+.attendo-teacher-content{order:2;padding:20px 16px 36px!important;width:100%;min-width:0;overflow-wrap:anywhere}
+.auth-result-card:has(.attendo-teacher-layout)>#authSignout{display:none!important}
+.attendo-teacher-content input,.attendo-teacher-content select,.attendo-teacher-content textarea{max-width:100%;min-width:0;font-size:16px!important}
+.attendo-teacher-content button{min-height:40px}
+.attendo-teacher-content [style*="repeat(4,minmax(0,1fr))"],.attendo-teacher-content .student-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+.attendo-teacher-content [style*="minmax(260px,1fr)"]{grid-template-columns:minmax(0,1fr)!important}
+.attendo-teacher-content section{max-width:100%;min-width:0}
+.attendo-teacher-content .student-history{padding:14px!important}
+}
+</style></head>
 <body>
 <div class="auth-gate" id="authGate">
  <section class="auth-card">
@@ -215,7 +234,14 @@ async function renderTeacherDashboard(panel){
  const topbar=document.createElement("div");topbar.className="attendo-live-topbar";
  const crumb=document.createElement("span");crumb.textContent="Workspace  /  교사 관리";
  const today=document.createElement("span");today.textContent=new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"long",day:"numeric"}).format(new Date());
- topbar.append(crumb,today);workspace.append(topbar,body);layout.append(tabs,workspace);
+ topbar.append(crumb,today);workspace.append(topbar,body);layout.append(tabs,workspace);(function installMobileAttendanceMenu(layout,nav,topbar){
+ const toggle=document.createElement("button");toggle.type="button";toggle.className="attendo-mobile-toggle";toggle.textContent="☰ 메뉴";toggle.setAttribute("aria-expanded","false");nav.id="attendo-mobile-navigation";toggle.setAttribute("aria-controls",nav.id);
+ const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");};
+ toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));};
+ nav.addEventListener("click",e=>{if(e.target.closest("button"))close();});layout.addEventListener("keydown",e=>{if(e.key==="Escape"){close();toggle.focus();}});
+ topbar.prepend(toggle);
+ const logout=document.createElement("button");logout.type="button";logout.className="attendo-mobile-logout";logout.textContent="로그아웃";logout.onclick=()=>document.getElementById("authSignout")?.click();nav.append(logout);
+})(layout,tabs,topbar);
  if(!document.getElementById("attendo-teacher-layout-style")){const css=document.createElement("style");css.id="attendo-teacher-layout-style";css.textContent=".auth-result:has(.attendo-teacher-layout){padding:0;display:block;background:#f5f7fb}.auth-result-card:has(.attendo-teacher-layout){max-width:none;width:100%;min-height:100vh;padding:0;border:0;border-radius:0;box-shadow:none;background:#f5f7fb}.auth-result-card:has(.attendo-teacher-layout)>.auth-brand,.auth-result-card:has(.attendo-teacher-layout)>#authWelcome,.auth-result-card:has(.attendo-teacher-layout)>#authProfileInfo,.auth-result-card:has(.attendo-teacher-layout)>#buildMarker{display:none}.auth-result-card:has(.attendo-teacher-layout)>#studentAttendance{margin:0!important}.auth-result-card:has(.attendo-teacher-layout)>#authSignout{position:fixed;bottom:18px;left:18px;z-index:3;width:210px;text-align:center}.attendo-teacher-layout{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh;gap:0;align-items:stretch}.attendo-teacher-nav{display:flex;flex-direction:column;gap:6px;padding:26px 14px 86px;background:#fff;border-right:1px solid #e6eaf1;position:sticky;top:0;height:100vh;overflow-y:auto}.attendo-live-brand{display:flex;align-items:center;gap:10px;margin:0 0 28px;padding:0 8px 22px;border-bottom:1px solid #eef0f6}.attendo-live-logo{display:grid;place-items:center;width:43px;height:43px;flex-shrink:0;border-radius:12px;background:#4968e8;color:#fff;font-size:22px;font-weight:800}.attendo-live-brand strong{display:block;font-size:16px;color:#172033}.attendo-live-brand small{display:block;font-size:9px;letter-spacing:1.2px;color:#98a2b3;margin-top:3px}.attendo-teacher-content{min-width:0;padding:24px 34px 50px}.attendo-teacher-nav button:focus-visible{outline:2px solid #4968e8;outline-offset:2px}.attendo-teacher-nav button[hidden]{display:none!important}@media(max-width:720px){.attendo-teacher-layout{grid-template-columns:1fr}.attendo-teacher-nav{position:static;height:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:14px;gap:5px}.attendo-live-brand{grid-column:1/-1;margin-bottom:6px;padding-bottom:12px}.attendo-teacher-nav button{font-size:13px!important}.attendo-teacher-content{padding:18px 14px 84px}.auth-result-card:has(.attendo-teacher-layout)>#authSignout{left:auto;right:14px;bottom:12px;width:auto}}";css.textContent+=".attendo-live-workspace{min-width:0}.attendo-live-topbar{height:82px;background:#fff;border-bottom:1px solid #e6eaf1;display:flex;align-items:center;justify-content:space-between;padding:0 38px;color:#718096;font-size:12px;font-weight:600}.attendo-live-topbar span:last-child{border:1px solid #e6eaf1;background:#f8faff;border-radius:9px;padding:11px 14px}.attendo-nav-label{font-size:10px;font-weight:800;letter-spacing:1.8px;color:#98a2b3;padding:13px 13px 5px;margin-top:6px}.attendo-nav-icon{display:inline-block;width:26px;font-size:17px;color:#8290ad;font-weight:500}.attendo-teacher-nav button{border-left:0!important;border-radius:11px!important;padding:13px 12px!important}.attendo-teacher-nav button:hover{background:#f2f5ff!important}.attendo-live-heading{margin:10px 0 24px!important;padding:0 0 2px}.attendo-live-eyebrow{font-size:10px;letter-spacing:2px;color:#4968e8;font-weight:800;margin-bottom:9px}.attendo-live-heading h2{font-size:27px!important;letter-spacing:-.6px}.attendo-teacher-content{padding:34px 38px 60px}.attendo-teacher-content>div:not(.attendo-live-heading){max-width:1400px}.attendo-teacher-content button:not(.attendo-teacher-nav button){transition:background .15s}.attendo-teacher-content [style*=border-radius]{box-shadow:0 4px 20px rgba(30,49,100,.025)}@media(max-width:720px){.attendo-live-topbar{height:56px;padding:0 15px}.attendo-live-topbar span:last-child{padding:7px;font-size:10px}.attendo-teacher-content{padding:22px 15px 80px}.attendo-nav-label{grid-column:1/-1}}";document.head.append(css);}
  header.className="attendo-live-heading";
  const eyebrow=document.createElement("div");eyebrow.className="attendo-live-eyebrow";eyebrow.textContent="WORKSPACE / ATTENDANCE";heading.prepend(eyebrow);
@@ -927,7 +953,14 @@ async function showAuthenticatedUser(user){
  nav.innerHTML='<div class="attendo-live-brand"><span class="attendo-live-logo">A</span><span><strong>ATTENDO</strong><small>SMART ATTENDANCE</small></span></div><div class="attendo-nav-label">WORKSPACE</div>';
  const workspace=document.createElement("div");workspace.className="attendo-live-workspace";
  const top=document.createElement("div");top.className="attendo-live-topbar";const crumb=document.createElement("span");crumb.textContent="Workspace / 학생";const todayLabel=document.createElement("span");todayLabel.textContent=new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",dateStyle:"long"}).format(new Date());top.append(crumb,todayLabel);
- const content=document.createElement("div");content.className="attendo-teacher-content";workspace.append(top,content);layout.append(nav,workspace);panel.append(layout);
+ const content=document.createElement("div");content.className="attendo-teacher-content";workspace.append(top,content);layout.append(nav,workspace);panel.append(layout);(function installMobileAttendanceMenu(layout,nav,topbar){
+ const toggle=document.createElement("button");toggle.type="button";toggle.className="attendo-mobile-toggle";toggle.textContent="☰ 메뉴";toggle.setAttribute("aria-expanded","false");nav.id="attendo-mobile-navigation";toggle.setAttribute("aria-controls",nav.id);
+ const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");};
+ toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));};
+ nav.addEventListener("click",e=>{if(e.target.closest("button"))close();});layout.addEventListener("keydown",e=>{if(e.key==="Escape"){close();toggle.focus();}});
+ topbar.prepend(toggle);
+ const logout=document.createElement("button");logout.type="button";logout.className="attendo-mobile-logout";logout.textContent="로그아웃";logout.onclick=()=>document.getElementById("authSignout")?.click();nav.append(logout);
+})(layout,nav,top);
  const intro=document.createElement("div");intro.innerHTML='<div class="attendo-live-eyebrow">OVERVIEW / 01</div><h2>오늘도 좋은 하루예요 👋</h2><p>나의 출결 현황을 확인하세요.</p>';content.append(intro);
  const today=new Date(Date.now()+9*3600000).toISOString().slice(0,10);
  const controls=document.createElement("div");controls.style.cssText="display:flex;gap:12px;align-items:center;margin:20px 0";
