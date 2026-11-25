@@ -604,7 +604,28 @@ async function renderTeacherDashboard(panel){
   let {data:accounts,error}=await authClient.from("profiles").select("id,display_name,student_number,role,is_active,is_school_admin").eq("school_id",me.school_id).order("display_name").limit(500);
   if(error){count.textContent="계정 목록을 불러오지 못했습니다: "+error.message;return;}
   const awaitedUserId=(await authClient.auth.getUser()).data.user?.id;
+  const selected=new Set();
+  const bulk=document.createElement("button");bulk.type="button";bulk.style.cssText="padding:10px 14px;border-radius:9px;background:#4968e8;color:white";
+  const bulkNote=document.createElement("p");bulkNote.textContent="비활성 학생 중 신원과 재활성화 필요 여부를 확인한 계정만 선택하세요. 신규 가입자와 기존 비활성 계정이 함께 표시됩니다.";
+  const bulkMsg=document.createElement("p");bulkMsg.setAttribute("role","status");
+  body.insertBefore(bulkNote,count);body.insertBefore(bulk,count);body.insertBefore(bulkMsg,count);
+  let bulkBusy=false;
+  const eligible=a=>a.role==="student"&&a.is_active===false&&a.is_school_admin!==true&&a.id!==awaitedUserId;
+  const syncBulk=()=>{bulk.textContent=selected.size+"명 일괄 활성화";bulk.disabled=bulkBusy||!selected.size;};
+  bulk.onclick=async()=>{
+   const ids=[...selected];if(bulkBusy||!ids.length)return;
+   const names=accounts.filter(a=>ids.includes(a.id)).map(a=>a.display_name+" ("+(a.student_number||"학번 없음")+")");
+   if(!confirm("다음 학생들의 신원 및 활성화 자격을 확인했나요?\n"+names.join("\n")))return;
+   bulkBusy=true;syncBulk();bulkMsg.textContent="처리 중…";
+   try{
+    const {data,error}=await authClient.rpc("bulk_approve_students",{p_student_ids:ids});if(error)throw error;
+    selected.clear();bulkMsg.textContent=data+"명 활성화 완료 · "+(ids.length-data)+"명 미처리";
+    const result=await authClient.from("profiles").select("id,display_name,student_number,role,is_active,is_school_admin").eq("school_id",me.school_id).order("display_name").limit(500);
+    if(result.error){bulkMsg.textContent+=" · 목록 새로고침 필요";}else accounts=result.data;
+   }catch(e){bulkMsg.textContent="일괄 활성화 실패: "+(e.message||"서버 오류");}finally{bulkBusy=false;render();}
+  };
   const render=()=>{
+   selected.clear();syncBulk();
    list.replaceChildren();const q=search.value.trim().toLocaleLowerCase("ko-KR");
    const rows=(accounts||[]).filter(a=>(role.value==="all"||a.role===role.value)&&(status.value==="all"||(status.value==="active"&&a.is_active)||(status.value==="inactive"&&!a.is_active))&&((a.display_name||"").toLocaleLowerCase("ko-KR").includes(q)||(a.student_number||"").toLocaleLowerCase("ko-KR").includes(q)));
    count.textContent="조회된 계정 "+rows.length+"개 · 관리자 계정 변경 불가";
@@ -613,6 +634,7 @@ async function renderTeacherDashboard(panel){
     const name=document.createElement("strong");name.textContent=a.display_name||"이름 없음";
     const details=document.createElement("span");details.style.cssText="color:#667085;font-size:12px";details.textContent=(a.role==="student"?"학생":a.role==="teacher"?"교사":a.role==="admin"?"관리자":a.role)+(a.is_school_admin?" · 학교 관리자":"")+(a.student_number?" · 학번 "+a.student_number:"")+" · "+(a.is_active?"활성":"비활성");
     const info=document.createElement("div");info.style.cssText="display:grid;gap:4px";info.append(name,details);item.append(info);
+    if(eligible(a)){const check=document.createElement("input");check.type="checkbox";check.setAttribute("aria-label",(a.display_name||"학생")+" 활성화 선택");check.disabled=bulkBusy;check.onchange=()=>{if(check.checked){if(selected.size>=100){check.checked=false;bulkMsg.textContent="최대 100명까지 선택할 수 있습니다.";return;}selected.add(a.id);}else selected.delete(a.id);syncBulk();};item.prepend(check);}
     if(a.id!==awaitedUserId&&a.role!=="admin"&&a.is_school_admin!==true){
      const toggle=document.createElement("button");toggle.textContent=a.is_active?"비활성화":"다시 활성화";toggle.style.cssText="padding:9px 12px;border:1px solid #dfe5ef;border-radius:8px;background:#fff;color:#172033";
      toggle.addEventListener("click",async()=>{
