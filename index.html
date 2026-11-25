@@ -751,9 +751,9 @@ async function studentBarcodeGate(panel,user){
  start.onclick=async()=>{
   if(busy||closed)return;busy=true;start.disabled=true;
   try{
-   scanner=new Html5Qrcode(reader.id,{formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128]});
+   scanner=new Html5Qrcode(reader.id,{formatsToSupport:[Html5QrcodeSupportedFormats.CODE_128],useBarCodeDetectorIfSupported:false});
    let accepted=false;
-   await scanner.start({facingMode:"environment"},{fps:10},async(value)=>{
+   await scanner.start({facingMode:"environment"},{fps:15,aspectRatio:1.777778,disableFlip:false},async(value)=>{
     if(accepted||closed)return;accepted=true;
     await stop();if(!panel.isConnected)return;
     try{
