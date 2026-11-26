@@ -67,6 +67,21 @@
 .attendo-teacher-content section{max-width:100%;min-width:0}
 .attendo-teacher-content .student-history{padding:14px!important}
 }
+</style><style>
+@media(max-width:720px){
+.auth-result:has(.attendo-teacher-layout){display:block!important;width:100%;min-width:0}
+.auth-result-card:has(.attendo-teacher-layout),.attendo-teacher-layout{width:100%!important;max-width:100%!important;min-width:0!important}
+.attendo-teacher-content .attendo-overview-sections{grid-template-columns:minmax(0,1fr)!important;gap:16px!important}
+.attendo-overview-sections>*{min-width:0;max-width:100%}
+.attendo-teacher-content>div{min-width:0;max-width:100%}
+.attendo-live-topbar>span:first-of-type{min-width:0;overflow-wrap:anywhere}
+.attendo-live-topbar>span:last-child{flex-shrink:0}
+.attendo-teacher-content svg{max-width:100%}
+}
+@media(max-width:360px){
+.attendo-live-topbar>span:first-of-type{display:none}
+.attendo-teacher-content [style*="repeat(4,minmax(0,1fr))"]>div{padding:14px!important}
+}
 </style></head>
 <body>
 <div class="auth-gate" id="authGate">
@@ -262,7 +277,7 @@ async function renderTeacherDashboard(panel){
   const title=document.createElement("h2");title.textContent="오늘의 출결 대시보드";title.style.cssText="font-size:28px;letter-spacing:-.8px;margin:0 0 8px";
   const sub=document.createElement("p");sub.textContent="실제 조회 권한이 있는 출결 기록을 기준으로 표시합니다.";sub.style.cssText="font-size:13px;color:#718096;margin:0";intro.append(eyebrow,title,sub);
   const cards=document.createElement("div");cards.style.cssText="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:22px";
-  const sections=document.createElement("div");sections.style.cssText="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:18px";
+  const sections=document.createElement("div");sections.style.cssText="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:18px";sections.className="attendo-overview-sections";
   const trend=document.createElement("section"),alerts=document.createElement("section"),recent=document.createElement("section");
   for(const card of [trend,alerts,recent])card.style.cssText="border:1px solid #e6eaf1;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 8px 24px rgba(31,45,80,.03)";
   const recentTitle=document.createElement("h3");recentTitle.textContent="최근 출결 기록";recentTitle.style.cssText="font-size:16px;margin:0;padding:20px;border-bottom:1px solid #eef1f5";
