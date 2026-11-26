@@ -82,6 +82,12 @@
 .attendo-live-topbar>span:first-of-type{display:none}
 .attendo-teacher-content [style*="repeat(4,minmax(0,1fr))"]>div{padding:14px!important}
 }
+</style><style>
+@media(max-width:720px){
+.attendo-teacher-layout.mobile-nav-open .attendo-teacher-content{display:none!important}
+.attendo-teacher-layout.mobile-nav-open>.attendo-teacher-nav{min-height:calc(100dvh - 60px);border-right:0;box-sizing:border-box}
+.attendo-teacher-layout.mobile-nav-open .attendo-live-workspace> :not(.attendo-live-topbar){display:none!important}
+}
 </style></head>
 <body>
 <div class="auth-gate" id="authGate">
@@ -251,8 +257,8 @@ async function renderTeacherDashboard(panel){
  const today=document.createElement("span");today.textContent=new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"long",day:"numeric"}).format(new Date());
  topbar.append(crumb,today);workspace.append(topbar,body);layout.append(tabs,workspace);(function installMobileAttendanceMenu(layout,nav,topbar){
  const toggle=document.createElement("button");toggle.type="button";toggle.className="attendo-mobile-toggle";toggle.textContent="☰ 메뉴";toggle.setAttribute("aria-expanded","false");nav.id="attendo-mobile-navigation";toggle.setAttribute("aria-controls",nav.id);
- const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");};
- toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));};
+ const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");toggle.textContent="☰ 메뉴";};
+ toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));toggle.textContent=open?"✕ 닫기":"☰ 메뉴";};
  nav.addEventListener("click",e=>{if(e.target.closest("button"))close();});layout.addEventListener("keydown",e=>{if(e.key==="Escape"){close();toggle.focus();}});
  topbar.prepend(toggle);
  const logout=document.createElement("button");logout.type="button";logout.className="attendo-mobile-logout";logout.textContent="로그아웃";logout.onclick=()=>document.getElementById("authSignout")?.click();nav.append(logout);
@@ -970,8 +976,8 @@ async function showAuthenticatedUser(user){
  const top=document.createElement("div");top.className="attendo-live-topbar";const crumb=document.createElement("span");crumb.textContent="Workspace / 학생";const todayLabel=document.createElement("span");todayLabel.textContent=new Intl.DateTimeFormat("ko-KR",{timeZone:"Asia/Seoul",dateStyle:"long"}).format(new Date());top.append(crumb,todayLabel);
  const content=document.createElement("div");content.className="attendo-teacher-content";workspace.append(top,content);layout.append(nav,workspace);panel.append(layout);(function installMobileAttendanceMenu(layout,nav,topbar){
  const toggle=document.createElement("button");toggle.type="button";toggle.className="attendo-mobile-toggle";toggle.textContent="☰ 메뉴";toggle.setAttribute("aria-expanded","false");nav.id="attendo-mobile-navigation";toggle.setAttribute("aria-controls",nav.id);
- const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");};
- toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));};
+ const close=()=>{layout.classList.remove("mobile-nav-open");toggle.setAttribute("aria-expanded","false");toggle.textContent="☰ 메뉴";};
+ toggle.onclick=()=>{const open=layout.classList.toggle("mobile-nav-open");toggle.setAttribute("aria-expanded",String(open));toggle.textContent=open?"✕ 닫기":"☰ 메뉴";};
  nav.addEventListener("click",e=>{if(e.target.closest("button"))close();});layout.addEventListener("keydown",e=>{if(e.key==="Escape"){close();toggle.focus();}});
  topbar.prepend(toggle);
  const logout=document.createElement("button");logout.type="button";logout.className="attendo-mobile-logout";logout.textContent="로그아웃";logout.onclick=()=>document.getElementById("authSignout")?.click();nav.append(logout);
