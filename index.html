@@ -1215,5 +1215,44 @@ document.getElementById("todayText").textContent=new Intl.DateTimeFormat("ko-KR"
 document.getElementById("reqDate").value=new Date().toISOString().slice(0,10);document.getElementById("corDate").value=new Date().toISOString().slice(0,10);
 renderStats();renderRecent();renderAlerts();renderAll();renderAI();renderRequests();
 </script>
+<style>
+.attendo-choice{display:grid;gap:6px;min-width:0;width:100%;position:relative}
+.attendo-choice-toggle,.attendo-choice-option{font:inherit;text-align:left;white-space:normal;overflow-wrap:anywhere;border:0;cursor:pointer}
+.attendo-choice-toggle{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px;padding:10px 12px;background:#f7f8fa;color:#191f28;border:1px solid #dce2ec;border-radius:8px;width:100%}
+.attendo-choice-options{display:grid;gap:3px;padding:5px;border:1px solid #dce2ec;border-radius:10px;background:white;max-height:240px;overflow:auto}
+.attendo-choice-options[hidden]{display:none}
+.attendo-choice-option{padding:10px 12px;background:white;color:#191f28;border-radius:6px}
+.attendo-choice-option[aria-pressed=true]{background:#eef1ff;color:#3855ce}
+.attendo-choice button:focus-visible{outline:2px solid #4968e8;outline-offset:2px}
+</style>
+<script>
+(function(){
+const widgets=new Map();
+function enhance(select){
+ if(widgets.has(select)||select.multiple||select.size>1||!select.closest(".attendo-teacher-layout"))return;
+ const wrap=document.createElement("div"),toggle=document.createElement("button"),options=document.createElement("div");
+ wrap.className="attendo-choice";toggle.className="attendo-choice-toggle";toggle.type="button";options.className="attendo-choice-options";options.hidden=true;
+ toggle.setAttribute("aria-expanded","false");wrap.append(toggle,options);select.after(wrap);select.hidden=true;select.style.setProperty("display","none","important");
+ const close=()=>{options.hidden=true;toggle.setAttribute("aria-expanded","false")};
+ let signature="";
+ function sync(){
+ const selected=select.selectedOptions[0];const label=select.getAttribute("aria-label")||select.labels?.[0]?.querySelector("span")?.textContent||"선택";
+ const display=(selected?.textContent||"선택하세요")+"  ▾";if(toggle.textContent!==display)toggle.textContent=display;toggle.setAttribute("aria-label",label+": "+(selected?.textContent||"선택하세요"));toggle.disabled=select.disabled;
+ const sig=JSON.stringify([select.selectedIndex,select.disabled,Array.from(select.options,o=>[o.textContent,o.value,o.disabled,o.parentElement.disabled])]);
+ if(sig===signature)return;signature=sig;options.replaceChildren();
+ Array.from(select.options).forEach((o,i)=>{const b=document.createElement("button");b.type="button";b.className="attendo-choice-option";b.textContent=o.textContent+(i===select.selectedIndex?"  ✓":"");b.disabled=o.disabled||!!o.parentElement.disabled;b.setAttribute("aria-pressed",String(i===select.selectedIndex));b.onclick=()=>{select.selectedIndex=i;close();select.dispatchEvent(new Event("input",{bubbles:true}));select.dispatchEvent(new Event("change",{bubbles:true}));sync();toggle.focus()};options.append(b)});
+ if(select.disabled)close();
+ }
+ toggle.onclick=()=>{sync();if(!options.hidden){close();return}for(const w of widgets.values())w.close();options.hidden=false;toggle.setAttribute("aria-expanded","true")};
+ wrap.addEventListener("keydown",e=>{if(e.key==="Escape"){close();toggle.focus();e.stopPropagation()}});
+ select.addEventListener("change",sync);widgets.set(select,{wrap,close,sync});sync();
+}
+function scan(){document.querySelectorAll(".attendo-teacher-layout select").forEach(enhance);for(const [s,w] of widgets){if(!s.isConnected){w.wrap.remove();widgets.delete(s)}else w.sync()}}
+ document.addEventListener("click",e=>{for(const w of widgets.values())if(!w.wrap.contains(e.target))w.close()});
+ let queued=false;function schedule(){if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;scan()})}
+ new MutationObserver(records=>{if(records.some(r=>!r.target.closest?.(".attendo-choice")))schedule()}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["disabled","selected","label"]});
+ document.addEventListener("click",schedule);document.addEventListener("reset",schedule);scan();
+})();
+</script>
 </body>
 </html>
