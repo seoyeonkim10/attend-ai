@@ -44,6 +44,8 @@ jobs:
           cp preview-source/scanner-quagga-test.html public/preview/scanner-quagga-test.html
           cp preview-source/check-in.html public/preview/check-in.html
           cp preview-source/device-check-in.html public/preview/device-check-in.html
+          mkdir -p public/demo
+          cp preview-source/demo/index.html public/demo/index.html
           touch public/.nojekyll
 
       - name: Configure Pages
